@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  tf:
+    build: ./tf
+    container_name: tf
+    tty: true
+    volumes:
+      - ./tf:/workspace:cached

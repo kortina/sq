@@ -1,0 +1,65 @@
+#!/usr/bin/env python
+import click
+import os
+import re
+import subprocess
+import sys
+
+
+TF_CONTAINER = "tf"
+
+
+@click.group(help="Studio Quixote cli commands.")
+def cli():
+    pass
+
+
+@cli.group(help="Local (docker) commands ")
+def dev():
+    pass
+
+
+def _run_command(cmd, error_message=None, capture_output=False, hide_command=False):
+    # hide_command can be used to reduce the amount of output
+    if not hide_command:
+        click.secho("\n>> Running: {}\n".format(cmd), fg="green")
+    if error_message:
+        if capture_output:
+            raise "capture_output + error_message cannot both \
+                   be used, because subprocess.call does not \
+                   allow capture_output"
+
+        code = subprocess.call(cmd, shell=True)
+        if code != 0:
+            click.secho(error_message, fg="red")
+            sys.exit(code)
+    else:
+        try:
+            return subprocess.run(
+                cmd, shell=True, check=True, capture_output=capture_output
+            )
+        except subprocess.CalledProcessError as e:  # remote commands sometimes throw this
+            return subprocess.CompletedProcess(cmd, e.returncode, stderr=e.output)
+
+
+def _env_vars(inherit_env):
+    if not inherit_env:
+        return ""
+    prefix = re.compile(r"^SQ__")
+    args = []
+    for k, v in os.environ.items():
+        if re.match(prefix, k):
+            args.append('-e {0}="{1}"'.format(re.sub(prefix, "", k), v))
+    return " ".join(args)
+
+
+@dev.command(help="Start bash in docker container, inheriting SQ__ prefixed env vars.")
+@click.option("--inherit-env", is_flag=True, help="Inherit FA_DEV__ env vars.")
+def bash(inherit_env):
+    _run_command(
+        "docker exec {0} -it {1} bash".format(_env_vars(inherit_env), TF_CONTAINER)
+    )
+
+
+if __name__ == "__main__":
+    cli()
