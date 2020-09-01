@@ -1,0 +1,20 @@
+.DS_Store
+
+# temp output file for checking changes before applying
+plan.tfplan
+plan.before.tfplan
+plan.after.tfplan
+
+# don't need to track the terraform backup, 
+# it's just a local backup before a single run
+*.tfstate*.backup
+
+keys
+
+# modules dir
+.terraform/
+
+# variables
+terraform.tfvars
+
+*.pyc

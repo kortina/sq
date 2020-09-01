@@ -49,7 +49,7 @@ def _env_vars(inherit_env):
     args = []
     for k, v in os.environ.items():
         if re.match(prefix, k):
-            args.append('-e {0}="{1}"'.format(re.sub(prefix, "", k), v))
+            args.append('-e {0}="${1}"'.format(re.sub(prefix, "", k), k))
     return " ".join(args)
 
 
