@@ -54,10 +54,14 @@ def _env_vars(inherit_env):
 
 
 @dev.command(help="Start bash in docker container, inheriting SQ__ prefixed env vars.")
-@click.option("--inherit-env", is_flag=True, help="Inherit FA_DEV__ env vars.")
-def bash(inherit_env):
+@click.option(
+    "--no-inherit-env", is_flag=True, help="Do NOT inherit FA_DEV__ env vars."
+)
+def bash(no_inherit_env):
     _run_command(
-        "docker exec {0} -it {1} bash".format(_env_vars(inherit_env), TF_CONTAINER)
+        "docker exec {0} -it {1} bash".format(
+            _env_vars(not no_inherit_env), TF_CONTAINER
+        )
     )
 
 
