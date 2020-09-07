@@ -108,15 +108,15 @@ def tf_plan(targets):
         for target in targets:
             plan_args.append(f"-target={target}")
     plan_args = " ".join(plan_args)
-    cmd = f"cd tf && terraform plan -module-depth=-1 -out=plan.tfplan {plan_args} . | landscape"
+    cmd = f"cd tf && terraform plan -out=plan.tfplan {plan_args} . | landscape"
     _run_command(cmd)
 
 
 @tf.command(help="Run tf plan in docker.")
 @click.option("--no-inherit-env", is_flag=True, help="Do NOT inherit SQ__ env vars.")
 @click.argument("targets", type=click.STRING, required=False)
-def plan(no_inherit_env, targets):
-    _docker_exec("./sq docker tf-plan {0}".format(targets), not no_inherit_env)
+def plan(no_inherit_env, targets=""):
+    _docker_exec("./sq docker tf-plan {0}".format(targets or ""), not no_inherit_env)
 
 
 @ffmpeg.command(help="Convert to mp4 for import to DaVinci Resolve.")
