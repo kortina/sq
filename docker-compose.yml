@@ -6,5 +6,5 @@ services:
     container_name: tf
     tty: true
     volumes:
-      - ./tf:/workspace:cached
+      - ./:/workspace:cached
   # pg:

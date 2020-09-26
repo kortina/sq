@@ -24,9 +24,27 @@ def ffmpeg():
     pass
 
 
+@cli.group(help="Commands to be run inside the docker host only.")
+def docker():
+    pass
+
+
+@cli.group(help="Local (docker) commands.")
+def tf():
+    pass
+
+
 def _is_mp4(ctx, param, value):
     if not re.match(r"\.mp4$", value):
         raise click.BadParameter("Output file must be .mp4")
+
+
+def _ensure_docker():
+    if not os.path.exists("/.dockerenv"):
+        raise click.UsageError(
+            "This command should only be run in the docker container, ie,"
+            " via some other sq command, not directly."
+        )
 
 
 def _run_command(cmd, error_message=None, capture_output=False, hide_command=False):
@@ -52,6 +70,11 @@ def _run_command(cmd, error_message=None, capture_output=False, hide_command=Fal
             return subprocess.CompletedProcess(cmd, e.returncode, stderr=e.output)
 
 
+def _docker_exec(cmd, inherit_env):
+    e_vars = _env_vars(inherit_env)
+    _run_command("docker exec {0} -it {1} {2}".format(e_vars, TF_CONTAINER, cmd))
+
+
 def _env_vars(inherit_env):
     if not inherit_env:
         return ""
@@ -60,19 +83,40 @@ def _env_vars(inherit_env):
     for k, v in os.environ.items():
         if re.match(prefix, k):
             args.append('-e {0}="${1}"'.format(re.sub(prefix, "", k), k))
+            # special case set some TF_VAR's
+            if k == "SQ__AWS_ACCESS_KEY_ID":
+                args.append('-e TF_VAR_access_key="${0}"'.format(k))
+            if k == "SQ__AWS_SECRET_KEY":
+                args.append('-e TF_VAR_secret_key="${0}"'.format(k))
+
     return " ".join(args)
 
 
 @dev.command(help="Start bash in docker container, inheriting SQ__ prefixed env vars.")
-@click.option(
-    "--no-inherit-env", is_flag=True, help="Do NOT inherit FA_DEV__ env vars."
-)
+@click.option("--no-inherit-env", is_flag=True, help="Do NOT inherit SQ__ env vars.")
 def bash(no_inherit_env):
-    _run_command(
-        "docker exec {0} -it {1} bash".format(
-            _env_vars(not no_inherit_env), TF_CONTAINER
-        )
-    )
+    _docker_exec("bash", not no_inherit_env)
+
+
+@docker.command(help="Run tf plan in docker.")
+@click.argument("targets", type=click.STRING, required=False)
+def tf_plan(targets):
+    _ensure_docker()
+    plan_args = []
+    if targets:
+        targets = targets.split(" ")
+        for target in targets:
+            plan_args.append(f"-target={target}")
+    plan_args = " ".join(plan_args)
+    cmd = f"cd tf && terraform plan -out=plan.tfplan {plan_args} . | landscape"
+    _run_command(cmd)
+
+
+@tf.command(help="Run tf plan in docker.")
+@click.option("--no-inherit-env", is_flag=True, help="Do NOT inherit SQ__ env vars.")
+@click.argument("targets", type=click.STRING, required=False)
+def plan(no_inherit_env, targets=""):
+    _docker_exec("./sq docker tf-plan {0}".format(targets or ""), not no_inherit_env)
 
 
 @ffmpeg.command(help="Convert to mp4 for import to DaVinci Resolve.")

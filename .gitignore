@@ -16,5 +16,6 @@ keys
 
 # variables
 terraform.tfvars
+vpn_certs
 
 *.pyc
