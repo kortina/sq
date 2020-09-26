@@ -1,3 +1,0 @@
-[submodule "tf/terraform-aws-client-vpn-endpoint"]
-	path = tf/terraform-aws-client-vpn-endpoint
-	url = git@github.com:achuchulev/terraform-aws-client-vpn-endpoint.git
