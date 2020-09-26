@@ -7,4 +7,12 @@ services:
     tty: true
     volumes:
       - ./:/workspace:cached
-  # pg:
+  pg:
+    image: postgres:9.5.23
+    ports:
+      - '54325:5432'
+    restart: always
+    environment:
+      - POSTGRES_DB=cyberpunk202x
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=DaVinci
