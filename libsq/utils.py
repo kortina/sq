@@ -7,6 +7,13 @@ import sys
 TF_CONTAINER = "tf"
 
 
+def _ensure_host():
+    if os.path.exists("/.dockerenv"):
+        raise click.UsageError(
+            "This command should only be run on the host, not in the docker container."
+        )
+
+
 def _ensure_docker():
     if not os.path.exists("/.dockerenv"):
         raise click.UsageError(
