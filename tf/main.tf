@@ -875,8 +875,8 @@ resource "aws_vpc" "vpc-c043bba6" {
     enable_dns_support   = true
     instance_tenancy     = "default"
 
-    tags = {
-    }
+    # tags = {
+    # }
 }
 
 resource "aws_vpc" "vpc-08ecdd9d68981bee5" {
@@ -885,11 +885,11 @@ resource "aws_vpc" "vpc-08ecdd9d68981bee5" {
     enable_dns_support   = true
     instance_tenancy     = "default"
 
-    tags = {
-        "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
-        "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
-        "aws:cloudformation:logical-id" = "Vpc"
-    }
+    # tags = {
+    #     "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
+    #     "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
+    #     "aws:cloudformation:logical-id" = "Vpc"
+    # }
 }
 
 # resource "aws_cloudformation_stack" "EC2ContainerService-sq" {
