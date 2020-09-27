@@ -4,7 +4,7 @@ import re
 import subprocess
 import sys
 
-TF_CONTAINER = "tf"
+TF_CONTAINER = "sq_tf"
 
 
 def _ensure_host():

@@ -27,6 +27,21 @@ def dump(dbname):
     _docker_exec("./sq docker pg-dump {0}".format(dbname), True)
 
 
+@docker.command(help="restore db.")
+@click.argument("dbname", type=click.STRING, required=True)
+@click.argument("dumpfile", type=click.Path(exists=True), required=True)
+def pg_restore(dbname, dumpfile):
+    _ensure_docker()
+    _run_command(f"psql -d {dbname} -f {dumpfile}")
+
+
+@pg.command(help="restore db.")
+@click.argument("dbname", type=click.STRING, required=True)
+@click.argument("dumpfile", type=click.Path(exists=True), required=True)
+def restore(dbname, dumpfile):
+    _docker_exec(f"./sq docker pg-restore {dbname} {dumpfile}", True)
+
+
 @pg.command(help="Stop the Mac DaVinci db (to free port 5432).")
 def stop_mac():
     _ensure_host()

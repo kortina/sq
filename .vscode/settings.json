@@ -5,6 +5,7 @@
         "dbname",
         "dockerenv",
         "libsq",
+        "postgres",
         "secho",
         "tfplan"
     ]

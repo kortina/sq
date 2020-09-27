@@ -1,13 +1,8 @@
 version: '3.8'
 
 services:
-  tf:
-    build: ./tf
-    container_name: tf
-    tty: true
-    volumes:
-      - ./:/workspace:cached
-  pg:
+  sq_pg:
+    container_name: sq_pg
     image: postgres:9.5.23
     expose:
       - '5432'
@@ -22,3 +17,16 @@ services:
       - POSTGRES_DB=cyberpunk202x
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=DaVinci
+  sq_tf:
+    container_name: sq_tf
+    build: ./tf
+    tty: true
+    volumes:
+      - ./:/workspace:cached
+    links:
+      - sq_pg
+    environment:
+      POSTGRES_DB: 'cyberpunk202x'
+      POSTGRES_USER: 'postgres'
+      POSTGRES_PASSWORD: 'DaVinci'
+      PG: 'postgres://postgres:DaVinci@sq_pg/cyberpunk202x'
