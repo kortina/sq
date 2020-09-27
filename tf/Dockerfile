@@ -3,6 +3,7 @@ RUN apt-get update
 RUN apt-get install -y rubygems postgresql postgresql-contrib python3-pip
 RUN pip3 install click
 RUN gem install terraform_landscape
+RUN gem install terraforming
 COPY . .
 # CMD ["flask", "run"]
 ENTRYPOINT ["tail", "-f", "/dev/null"]
