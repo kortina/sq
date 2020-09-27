@@ -4,3 +4,4 @@
   - [ ] sq command to connect to this docker container in a bash shell
   - [ ] backups
 - [ ] sq command to forward aws pg to local port via ssh
+- [ ] s3 bucket in us-west-1
