@@ -5,7 +5,9 @@
         "dbname",
         "dockerenv",
         "libsq",
+        "pgdata",
         "postgres",
+        "rsync",
         "secho",
         "tfplan"
     ]
