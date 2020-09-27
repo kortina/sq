@@ -1,6 +1,12 @@
 import click
 from . import docker, pg, HOST_MAC_IP
-from .utils import _docker_exec, _ensure_docker, _ensure_host, _run_command
+from .utils import (
+    _docker_exec,
+    _ensure_docker,
+    _ensure_host,
+    _run_command,
+    PG_CONTAINER,
+)
 
 HOST_MAC_PG_CTL = "/Library/PostgreSQL/9.5/bin/pg_ctl "
 HOST_MAC_DATA = "/Library/PostgreSQL/9.5/data"
@@ -32,7 +38,16 @@ def dump(dbname):
 @click.argument("dumpfile", type=click.Path(exists=True), required=True)
 def pg_restore(dbname, dumpfile):
     _ensure_docker()
-    _run_command(f"psql -d {dbname} -f {dumpfile}")
+    _run_command(
+        (
+            ' PGPASSWORD="$POSTGRES_PASSWORD"'
+            " psql"
+            f" -h {PG_CONTAINER}"
+            f' -U "$POSTGRES_USER"'
+            f" -d {dbname}"
+            f" -f {dumpfile}"
+        )
+    )
 
 
 @pg.command(help="restore db.")

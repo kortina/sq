@@ -5,6 +5,7 @@ import subprocess
 import sys
 
 TF_CONTAINER = "sq_tf"
+PG_CONTAINER = "sq_pg"
 
 
 def _ensure_host():
@@ -45,9 +46,9 @@ def _run_command(cmd, error_message=None, capture_output=False, hide_command=Fal
             return subprocess.CompletedProcess(cmd, e.returncode, stderr=e.output)
 
 
-def _docker_exec(cmd, inherit_env):
+def _docker_exec(cmd, inherit_env, container=TF_CONTAINER):
     e_vars = _env_vars(inherit_env)
-    _run_command("docker exec {0} -it {1} {2}".format(e_vars, TF_CONTAINER, cmd))
+    _run_command("docker exec {0} -it {1} {2}".format(e_vars, container, cmd))
 
 
 def _env_vars(inherit_env):
