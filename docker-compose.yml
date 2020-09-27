@@ -13,6 +13,9 @@ services:
       - '5432'
     ports:
       - '54325:5432'
+      # Optionally also fwd mac host port 5432 to docker.
+      # This is useful if you want DaVinci to be able to connect to the local
+      # docker pg db.
       - '5432:5432'
     restart: always
     environment:
