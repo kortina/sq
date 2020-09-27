@@ -821,11 +821,11 @@ resource "aws_subnet" "subnet-082e323ce59d549e3-subnet-082e323ce59d549e3" {
     availability_zone       = "us-west-1b"
     map_public_ip_on_launch = true
 
-    tags = {
-        "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
-        "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
-        "aws:cloudformation:logical-id" = "PubSubnetAz2"
-    }
+    # tags = {
+    #     "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
+    #     "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
+    #     "aws:cloudformation:logical-id" = "PubSubnetAz2"
+    # }
 }
 
 resource "aws_subnet" "subnet-01c1d06ee4451e7ff-subnet-01c1d06ee4451e7ff" {
@@ -834,11 +834,11 @@ resource "aws_subnet" "subnet-01c1d06ee4451e7ff-subnet-01c1d06ee4451e7ff" {
     availability_zone       = "us-west-1a"
     map_public_ip_on_launch = true
 
-    tags = {
-        "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
-        "aws:cloudformation:logical-id" = "PubSubnetAz1"
-        "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
-    }
+    # tags = {
+    #     "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
+    #     "aws:cloudformation:logical-id" = "PubSubnetAz1"
+    #     "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
+    # }
 }
 
 
