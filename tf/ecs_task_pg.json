@@ -1,0 +1,39 @@
+{
+  "requiresCompatibilities": ["FARGATE"],
+  "containerDefinitions": [
+    {
+      "memory": 128,
+      "portMappings": [],
+      "essential": true,
+      "mountPoints": [
+        {
+          "containerPath": "/usr/share/pgdata",
+          "sourceVolume": "efs-pgdata"
+        }
+      ],
+      "name": "sq_pg",
+      "image": "postgres:9.5.23",
+      "environment": [
+        { "name": "POSTGRES_DB", "value": "cyberpunk202x" },
+        { "name": "POSTGRES_USER", "value": "postgres" },
+        { "name": "POSTGRES_PASSWORD", "value": "DaVinci" },
+        { "name": "PGDATA", "value": "/usr/share/pgdata" }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "efs-pgdata",
+      "efsVolumeConfiguration": {
+        "fileSystemId": "fs-e7507afe",
+        "transitEncryption": "ENABLED"
+      }
+    }
+  ],
+  "networkMode": "awsvpc",
+  "memory": null,
+  "cpu": null,
+  "executionRoleArn": "<create_new>",
+  "family": "ecs-sq-pg",
+  "tags": []
+}
