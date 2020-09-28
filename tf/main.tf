@@ -46,23 +46,23 @@ resource "aws_autoscaling_group" "EC2ContainerService-sq-EcsInstanceAsg-18YFD43E
         propagate_at_launch = true
     }
 
-    tag {
-        key   = "aws:cloudformation:logical-id"
-        value = "EcsInstanceAsg"
-        propagate_at_launch = true
-    }
+    # tag {
+    #     key   = "aws:cloudformation:logical-id"
+    #     value = "EcsInstanceAsg"
+    #     propagate_at_launch = true
+    # }
 
-    tag {
-        key   = "aws:cloudformation:stack-id"
-        value = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
-        propagate_at_launch = true
-    }
+    # tag {
+    #     key   = "aws:cloudformation:stack-id"
+    #     value = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
+    #     propagate_at_launch = true
+    # }
 
-    tag {
-        key   = "aws:cloudformation:stack-name"
-        value = "EC2ContainerService-sq"
-        propagate_at_launch = true
-    }
+    # tag {
+    #     key   = "aws:cloudformation:stack-name"
+    #     value = "EC2ContainerService-sq"
+    #     propagate_at_launch = true
+    # }
 
 }
 
@@ -101,33 +101,102 @@ resource "aws_autoscaling_group" "EC2ContainerService-sq-EcsInstanceAsg-18YFD43E
 ##########
 # ec2.tf
 ##########
-resource "aws_instance" "ECS-Instance---EC2ContainerService-sq" {
-    ami                         = "ami-0b95d46a7f7393cfa"
-    availability_zone           = "us-west-1a"
-    ebs_optimized               = false
-    instance_type               = "t2.micro"
-    monitoring                  = true
-    key_name                    = "sq_aws"
-    subnet_id                   = "subnet-01c1d06ee4451e7ff"
-    vpc_security_group_ids      = ["sg-0176e8021bec0c6b4"]
-    associate_public_ip_address = true
-    private_ip                  = "10.0.0.68"
-    source_dest_check           = true
+# trying to tf gives output. I *think* because it is from an autoscaling group?
+# aws_instance.ECS-Instance---EC2ContainerService-sq must be replaced
+# -/+ resource "aws_instance" "ECS-Instance---EC2ContainerService-sq"
+# so I did a:
+#   terraform state rm aws_instance.ECS-Instance---EC2ContainerService-sq
+#
+# resource "aws_instance" "ECS-Instance---EC2ContainerService-sq" {
+#     ami                          = "ami-0b95d46a7f7393cfa"
+#     # arn                          = "arn:aws:ec2:us-west-1:965006678408:instance/i-08418fe9cb5bae602"
+#     associate_public_ip_address  = true
+#     availability_zone            = "us-west-1a"
+#     cpu_core_count               = 1
+#     cpu_threads_per_core         = 1
+#     disable_api_termination      = false
+#     ebs_optimized                = false
+#     get_password_data            = false
+#     hibernation                  = false
+#     iam_instance_profile         = "ecsInstanceRole"
+#     # id                           = "i-08418fe9cb5bae602"
+#     # instance_state               = "running"
+#     instance_type                = "t2.micro"
+#     ipv6_address_count           = 0
+#     ipv6_addresses               = []
+#     key_name                     = "sq_aws"
+#     monitoring                   = true
+#     # primary_network_interface_id = "eni-03210a5b91597fdde"
+#     # private_dns                  = "ip-10-0-0-68.us-west-1.compute.internal"
+#     private_ip                   = "10.0.0.68"
+#     # public_dns                   = "ec2-54-153-23-220.us-west-1.compute.amazonaws.com"
+#     # public_ip                    = "54.153.23.220"
+#     secondary_private_ips        = []
+#     security_groups              = []
+#     source_dest_check            = true
+#     subnet_id                    = "subnet-01c1d06ee4451e7ff"
+#     tags                         = {
+#         "Description" = "This instance is the part of the Auto Scaling group which was created through ECS Console"
+#         "Name"        = "ECS Instance - EC2ContainerService-sq"
+#     }
+#     tenancy                      = "default"
+#     user_data                    = "e78344e6ac600e3f6e061a8321080181773d92aa"
+#     volume_tags                  = {
+#         "Name" = "sq-pg-ebs"
+#     }
+#     vpc_security_group_ids       = [
+#         "sg-0176e8021bec0c6b4",
+#     ]
 
-    root_block_device {
-        volume_type           = "gp2"
-        volume_size           = 30
-        delete_on_termination = true
-    }
+#     credit_specification {
+#         cpu_credits = "standard"
+#     }
 
-    tags = {
-        "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
-        "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
-        "Name" = "ECS Instance - EC2ContainerService-sq"
-        "aws:autoscaling:groupName" = "EC2ContainerService-sq-EcsInstanceAsg-18YFD43EPILLE"
-        "aws:cloudformation:logical-id" = "EcsInstanceAsg"
-    }
-}
+#     metadata_options {
+#         http_endpoint               = "enabled"
+#         http_put_response_hop_limit = 1
+#         http_tokens                 = "optional"
+#     }
+
+#     root_block_device {
+#         delete_on_termination = true
+#         # device_name           = "/dev/xvda"
+#         encrypted             = false
+#         iops                  = 100
+#         # volume_id             = "vol-06ce095168539a52c"
+#         volume_size           = 30
+#         volume_type           = "gp2"
+#     }
+
+#     timeouts {}
+# }
+# resource "aws_instance" "ECS-Instance---EC2ContainerService-sq" {
+#     ami                         = "ami-0b95d46a7f7393cfa"
+#     availability_zone           = "us-west-1a"
+#     ebs_optimized               = false
+#     instance_type               = "t2.micro"
+#     monitoring                  = true
+#     key_name                    = "sq_aws"
+#     subnet_id                   = "subnet-01c1d06ee4451e7ff"
+#     vpc_security_group_ids      = ["sg-0176e8021bec0c6b4"]
+#     associate_public_ip_address = true
+#     private_ip                  = "10.0.0.68"
+#     source_dest_check           = true
+
+#     root_block_device {
+#         volume_type           = "gp2"
+#         volume_size           = 30
+#         delete_on_termination = true
+#     }
+
+#     tags = {
+#         "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
+#         "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
+#         "Name" = "ECS Instance - EC2ContainerService-sq"
+#         "aws:autoscaling:groupName" = "EC2ContainerService-sq-EcsInstanceAsg-18YFD43EPILLE"
+#         "aws:cloudformation:logical-id" = "EcsInstanceAsg"
+#     }
+# }
 
 
 
@@ -152,6 +221,9 @@ resource "aws_efs_file_system" "fs-e7507afe" {
     performance_mode = "generalPurpose"
     tags = {
         Name = "efs-for-ecs"
+    }
+    lifecycle_policy {
+        transition_to_ia = "AFTER_30_DAYS"
     }
 }
 
