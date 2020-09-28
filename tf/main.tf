@@ -659,11 +659,11 @@ resource "aws_route_table" "rtb-006b1040443ad832a" {
         gateway_id = "igw-0803f93bfcb0b3158"
     }
 
-    tags = {
-        "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
-        "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
-        "aws:cloudformation:logical-id" = "RouteViaIgw"
-    }
+    # tags = {
+    #     "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
+    #     "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
+    #     "aws:cloudformation:logical-id" = "RouteViaIgw"
+    # }
 }
 
 
