@@ -20,6 +20,8 @@ sudo apt-get install -y postgresql postgresql-contrib
 
 sudo mkdir -p /opt/ebs
 sudo chown -R ubuntu:ubuntu /opt/ebs
+exit
+# https://github.com/hashicorp/terraform/issues/2957
 sudo mount /dev/xvdf /opt/ebs
 mkdir -p /opt/ebs/pgdata
 
@@ -36,4 +38,4 @@ eval `ssh-agent`
 ssh-add sq_github_deploy_key
 git clone git@github.com:kortina/sq.git
 cd sq
-docker-compose up -d
+# docker-compose up -d

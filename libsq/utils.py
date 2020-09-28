@@ -64,5 +64,7 @@ def _env_vars(inherit_env):
                 args.append('-e TF_VAR_access_key="${0}"'.format(k))
             if k == "SQ__AWS_SECRET_KEY":
                 args.append('-e TF_VAR_secret_key="${0}"'.format(k))
+                # different tools expect different var names for this:
+                args.append('-e AWS_SECRET_ACCESS_KEY="${0}"'.format(k))
 
     return " ".join(args)
