@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.3'
 
 services:
   sq_pg:
@@ -13,10 +13,14 @@ services:
       # docker pg db.
       - '5432:5432'
     restart: always
+    volumes:
+      - /opt/ebs:/opt/ebs:cached
+      # /host/path:/container/path
     environment:
       - POSTGRES_DB=cyberpunk202x
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=DaVinci
+      - PGDATA=/opt/ebs/pgdata
   sq_tf:
     container_name: sq_tf
     build: ./tf

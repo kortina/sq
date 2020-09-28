@@ -18,3 +18,20 @@ def tail_davinci(lines):
         cmd = f"{cmd} -n {lines} "
     cmd = f'{cmd} "/Library/Application Support/Blackmagic Design/DaVinci Resolve/logs/davinci_resolve.log" '
     _run_command(cmd)
+
+
+@dev.command(help="Create mac host /opt/ebs")
+def mk_opt_ebs():
+    p = "/opt/ebs/pgdata"
+    _run_command(f"sudo mkdir -p {p}")
+    _run_command(f'sudo chown -R "`id -u -n`":staff {p}')
+
+
+@dev.command(help="Tunnel to the aws docker pg db.")
+@click.argument("host", type=click.STRING, required=True)
+@click.option("--local-port", type=click.STRING, required=False)
+def tunnel(host, local_port="54320"):
+    # TODO: figure out how to query aws for the host
+    user = "ubuntu"
+    cmd = f"ssh -vvv -TnN -L {local_port}:0.0.0.0:5432 {user}@{host}"
+    _run_command(cmd)
