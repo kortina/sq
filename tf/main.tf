@@ -207,55 +207,55 @@ resource "aws_iam_instance_profile" "ecsInstanceRole" {
 # iampa.tf
 ##########
 resource "aws_iam_role_policy_attachment" "AutoScalingServiceRolePolicy-policy-attachment" {
-    name       = "AutoScalingServiceRolePolicy-policy-attachment"
+    # name       = "AutoScalingServiceRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AutoScalingServiceRolePolicy"
     role       = "AWSServiceRoleForAutoScaling"
 }
 
 resource "aws_iam_role_policy_attachment" "AmazonECSServiceRolePolicy-policy-attachment" {
-    name       = "AmazonECSServiceRolePolicy-policy-attachment"
+    # name       = "AmazonECSServiceRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AmazonECSServiceRolePolicy"
     role       = "AWSServiceRoleForECS"
 }
 
 resource "aws_iam_role_policy_attachment" "AWSSupportServiceRolePolicy-policy-attachment" {
-    name       = "AWSSupportServiceRolePolicy-policy-attachment"
+    # name       = "AWSSupportServiceRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AWSSupportServiceRolePolicy"
     role       = "AWSServiceRoleForSupport"
 }
 
 resource "aws_iam_role_policy_attachment" "AmazonECSTaskExecutionRolePolicy-policy-attachment" {
-    name       = "AmazonECSTaskExecutionRolePolicy-policy-attachment"
+    # name       = "AmazonECSTaskExecutionRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
     role       = "ecsTaskExecutionRole"
 }
 
 resource "aws_iam_role_policy_attachment" "AWSTrustedAdvisorServiceRolePolicy-policy-attachment" {
-    name       = "AWSTrustedAdvisorServiceRolePolicy-policy-attachment"
+    # name       = "AWSTrustedAdvisorServiceRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AWSTrustedAdvisorServiceRolePolicy"
     role       = "AWSServiceRoleForTrustedAdvisor"
 }
 
 resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerServiceforEC2Role-policy-attachment" {
-    name       = "AmazonEC2ContainerServiceforEC2Role-policy-attachment"
+    # name       = "AmazonEC2ContainerServiceforEC2Role-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
     role       = "ecsInstanceRole"
 }
 
 resource "aws_iam_role_policy_attachment" "AmazonElasticFileSystemServiceRolePolicy-policy-attachment" {
-    name       = "AmazonElasticFileSystemServiceRolePolicy-policy-attachment"
+    # name       = "AmazonElasticFileSystemServiceRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AmazonElasticFileSystemServiceRolePolicy"
     role      = "AWSServiceRoleForAmazonElasticFileSystem"
 }
 
 resource "aws_iam_role_policy_attachment" "AWSBackupServiceLinkedRolePolicyForBackup-policy-attachment" {
-    name       = "AWSBackupServiceLinkedRolePolicyForBackup-policy-attachment"
+    # name       = "AWSBackupServiceLinkedRolePolicyForBackup-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AWSBackupServiceLinkedRolePolicyForBackup"
     role       = "AWSServiceRoleForBackup"
 }
 
 resource "aws_iam_user_policy_attachment" "AdministratorAccess-policy-attachment" {
-    name       = "AdministratorAccess-policy-attachment"
+    # name       = "AdministratorAccess-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
     user       = "sqdev"
 }
