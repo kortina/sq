@@ -1,3 +1,7 @@
+module "ec2_docker_instance" {
+    source = "./modules/ec2_docker"   
+}
+
 # basically created with
 # https://docs.aws.amazon.com/AmazonECS/latest/developerguide/tutorial-efs-volumes.html
 # BUT used regular ECS  (not Fargate)
