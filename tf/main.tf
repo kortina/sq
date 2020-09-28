@@ -303,6 +303,7 @@ POLICY
 }
 
 resource "aws_iam_role" "AWSServiceRoleForAutoScaling" {
+    description        = "Default Service-Linked Role enables access to AWS Services and Resources used or managed by Auto Scaling"
     name               = "AWSServiceRoleForAutoScaling"
     path               = "/aws-service-role/autoscaling.amazonaws.com/"
     assume_role_policy = <<POLICY
@@ -341,6 +342,7 @@ POLICY
 }
 
 resource "aws_iam_role" "AWSServiceRoleForECS" {
+    description        = "Role to enable Amazon ECS to manage your cluster."
     name               = "AWSServiceRoleForECS"
     path               = "/aws-service-role/ecs.amazonaws.com/"
     assume_role_policy = <<POLICY
@@ -360,6 +362,7 @@ POLICY
 }
 
 resource "aws_iam_role" "AWSServiceRoleForSupport" {
+    description        = "Enables resource access for AWS to provide billing, administrative and support services"
     name               = "AWSServiceRoleForSupport"
     path               = "/aws-service-role/support.amazonaws.com/"
     assume_role_policy = <<POLICY
@@ -379,6 +382,8 @@ POLICY
 }
 
 resource "aws_iam_role" "AWSServiceRoleForTrustedAdvisor" {
+    description        = "Access for the AWS Trusted Advisor Service to help reduce cost, increase performance, and improve security of your AWS environment." 
+
     name               = "AWSServiceRoleForTrustedAdvisor"
     path               = "/aws-service-role/trustedadvisor.amazonaws.com/"
     assume_role_policy = <<POLICY
@@ -467,11 +472,11 @@ resource "aws_iam_user" "sqdev" {
 resource "aws_internet_gateway" "igw-0803f93bfcb0b3158" {
     vpc_id = "vpc-08ecdd9d68981bee5"
 
-    tags = {
-        "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
-        "aws:cloudformation:logical-id" = "InternetGateway"
-        "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
-    }
+    # tags = {
+    #     "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
+    #     "aws:cloudformation:logical-id" = "InternetGateway"
+    #     "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
+    # }
 }
 
 
@@ -579,6 +584,7 @@ resource "aws_network_acl" "acl-870693e1" {
 # nif.tf
 ##########
 resource "aws_network_interface" "eni-06d89663249a7b5e8" {
+    description       = "EFS mount target for fs-e7507afe (fsmt-4d56ee54)"
     subnet_id         = "subnet-01c1d06ee4451e7ff"
     private_ips       = ["10.0.0.5"]
     security_groups   = ["sg-054dc2a574201ef5b", "sg-0a69a1c70b137ad76"]
@@ -597,6 +603,7 @@ resource "aws_network_interface" "eni-03210a5b91597fdde" {
 }
 
 resource "aws_network_interface" "eni-031f0f3bda55b5b13" {
+    description       = "EFS mount target for fs-e7507afe (fsmt-4b56ee52)"
     subnet_id         = "subnet-082e323ce59d549e3"
     private_ips       = ["10.0.1.164"]
     security_groups   = ["sg-054dc2a574201ef5b", "sg-0a69a1c70b137ad76"]
