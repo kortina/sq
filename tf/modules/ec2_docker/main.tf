@@ -56,9 +56,9 @@ resource "aws_ebs_volume" "docker-host-data-vol" {
  }
 
 }
-#
-resource "aws_volume_attachment" "docker-host-vol" {
- device_name = "/dev/xvdf"
- volume_id = aws_ebs_volume.docker-host-data-vol.id
- instance_id = aws_instance.docker-host.id
-}
+# https://github.com/hashicorp/terraform/issues/2957
+# resource "aws_volume_attachment" "docker-host-vol" {
+#  device_name = "/dev/xvdf"
+#  volume_id = aws_ebs_volume.docker-host-data-vol.id
+#  instance_id = aws_instance.docker-host.id
+# }

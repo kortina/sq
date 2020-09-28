@@ -8,3 +8,4 @@
 - [ ] define project directory / bin structure (new project command)
 - [ ] s3 rsync scripts
 - [ ] https://github.com/kylemanna/docker-openvpn
+- https://github.com/hashicorp/terraform/issues/2957
