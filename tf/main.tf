@@ -206,78 +206,59 @@ resource "aws_iam_instance_profile" "ecsInstanceRole" {
 ##########
 # iampa.tf
 ##########
-resource "aws_iam_policy_attachment" "AutoScalingServiceRolePolicy-policy-attachment" {
+resource "aws_iam_role_policy_attachment" "AutoScalingServiceRolePolicy-policy-attachment" {
     name       = "AutoScalingServiceRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AutoScalingServiceRolePolicy"
-    groups     = []
-    users      = []
-    roles      = ["AWSServiceRoleForAutoScaling"]
+    role       = "AWSServiceRoleForAutoScaling"
 }
 
-resource "aws_iam_policy_attachment" "AmazonECSServiceRolePolicy-policy-attachment" {
+resource "aws_iam_role_policy_attachment" "AmazonECSServiceRolePolicy-policy-attachment" {
     name       = "AmazonECSServiceRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AmazonECSServiceRolePolicy"
-    groups     = []
-    users      = []
-    roles      = ["AWSServiceRoleForECS"]
+    role       = "AWSServiceRoleForECS"
 }
 
-resource "aws_iam_policy_attachment" "AdministratorAccess-policy-attachment" {
-    name       = "AdministratorAccess-policy-attachment"
-    policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
-    groups     = []
-    users      = ["sqdev"]
-    roles      = []
-}
-
-resource "aws_iam_policy_attachment" "AWSSupportServiceRolePolicy-policy-attachment" {
+resource "aws_iam_role_policy_attachment" "AWSSupportServiceRolePolicy-policy-attachment" {
     name       = "AWSSupportServiceRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AWSSupportServiceRolePolicy"
-    groups     = []
-    users      = []
-    roles      = ["AWSServiceRoleForSupport"]
+    role       = "AWSServiceRoleForSupport"
 }
 
-resource "aws_iam_policy_attachment" "AmazonECSTaskExecutionRolePolicy-policy-attachment" {
+resource "aws_iam_role_policy_attachment" "AmazonECSTaskExecutionRolePolicy-policy-attachment" {
     name       = "AmazonECSTaskExecutionRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-    groups     = []
-    users      = []
-    roles      = ["ecsTaskExecutionRole"]
+    role       = "ecsTaskExecutionRole"
 }
 
-resource "aws_iam_policy_attachment" "AWSTrustedAdvisorServiceRolePolicy-policy-attachment" {
+resource "aws_iam_role_policy_attachment" "AWSTrustedAdvisorServiceRolePolicy-policy-attachment" {
     name       = "AWSTrustedAdvisorServiceRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AWSTrustedAdvisorServiceRolePolicy"
-    groups     = []
-    users      = []
-    roles      = ["AWSServiceRoleForTrustedAdvisor"]
+    role       = "AWSServiceRoleForTrustedAdvisor"
 }
 
-resource "aws_iam_policy_attachment" "AmazonEC2ContainerServiceforEC2Role-policy-attachment" {
+resource "aws_iam_role_policy_attachment" "AmazonEC2ContainerServiceforEC2Role-policy-attachment" {
     name       = "AmazonEC2ContainerServiceforEC2Role-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
-    groups     = []
-    users      = []
-    roles      = ["ecsInstanceRole"]
+    role       = "ecsInstanceRole"
 }
 
-resource "aws_iam_policy_attachment" "AmazonElasticFileSystemServiceRolePolicy-policy-attachment" {
+resource "aws_iam_role_policy_attachment" "AmazonElasticFileSystemServiceRolePolicy-policy-attachment" {
     name       = "AmazonElasticFileSystemServiceRolePolicy-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AmazonElasticFileSystemServiceRolePolicy"
-    groups     = []
-    users      = []
-    roles      = ["AWSServiceRoleForAmazonElasticFileSystem"]
+    role      = "AWSServiceRoleForAmazonElasticFileSystem"
 }
 
-resource "aws_iam_policy_attachment" "AWSBackupServiceLinkedRolePolicyForBackup-policy-attachment" {
+resource "aws_iam_role_policy_attachment" "AWSBackupServiceLinkedRolePolicyForBackup-policy-attachment" {
     name       = "AWSBackupServiceLinkedRolePolicyForBackup-policy-attachment"
     policy_arn = "arn:aws:iam::aws:policy/aws-service-role/AWSBackupServiceLinkedRolePolicyForBackup"
-    groups     = []
-    users      = []
-    roles      = ["AWSServiceRoleForBackup"]
+    role       = "AWSServiceRoleForBackup"
 }
 
+resource "aws_iam_user_policy_attachment" "AdministratorAccess-policy-attachment" {
+    name       = "AdministratorAccess-policy-attachment"
+    policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+    user       = "sqdev"
+}
 
 
 ##########
