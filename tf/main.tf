@@ -712,11 +712,11 @@ resource "aws_security_group" "vpc-08ecdd9d68981bee5-EC2ContainerService-sq-EcsS
         cidr_blocks     = ["0.0.0.0/0"]
     }
 
-    tags = {
-        "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
-        "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
-        "aws:cloudformation:logical-id" = "EcsSecurityGroup"
-    }
+    # tags = {
+    #     "aws:cloudformation:stack-name" = "EC2ContainerService-sq"
+    #     "aws:cloudformation:stack-id" = "arn:aws:cloudformation:us-west-1:965006678408:stack/EC2ContainerService-sq/d3aade70-00ea-11eb-be79-06621dc34151"
+    #     "aws:cloudformation:logical-id" = "EcsSecurityGroup"
+    # }
 }
 
 resource "aws_security_group" "vpc-c043bba6-default" {
@@ -798,6 +798,7 @@ resource "aws_security_group" "vpc-08ecdd9d68981bee5-EFS-access-for-sg-0176e8021
         protocol        = "tcp"
         security_groups = ["sg-0176e8021bec0c6b4"]
         self            = false
+        description     = "Allow EFS access for ECS"
     }
 
 
