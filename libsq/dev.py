@@ -1,10 +1,13 @@
 import click
+import os
 from . import dev
 from .utils import (
+    _aws_kwargs,
     _docker_exec,
     _ensure_host,
     _run_command,
     _running_ec2_docker_public_hostname,
+    _sq_path_join,
 )
 
 EC2_USER = "ubuntu"  # ec2-user
@@ -54,9 +57,53 @@ def tunnel(host=None, local_port=None, print_only=None):
         _run_command(cmd, capture_output=False)
 
 
-@dev.command(help="ssh to the aws docker pg db.")
+@dev.command(help="ssh to the aws docker host.")
 def ssh():
     host = _running_ec2_docker_public_hostname()
     user = EC2_USER
     cmd = f"ssh {user}@{host}"
+    _run_command(cmd, capture_output=False)
+
+
+@dev.command(help="pre bootstrap.")
+def pre_bootstrap():
+    home = os.environ.get("HOME")
+    _scp(f"{home}/.ssh/sq_github_deploy_key", None)
+    _scp(_sq_path_join("tf/modules/ec2_docker/ec2-bootstrap.sh"), None)
+    _scp(_sq_path_join("tf/modules/ec2_docker/ec2-mount-vol.sh"), None)
+
+    host = _running_ec2_docker_public_hostname()
+    user = EC2_USER
+    k = _aws_kwargs()
+    r = k["region_name"]
+    s = k["aws_secret_access_key"]
+    a = k["aws_access_key_id"]
+
+    ssh_run = f"""ssh {user}@{host}"""
+    _run_command(f"{ssh_run} touch .bash_profile", capture_output=False)
+
+    cmd = (
+        f"""{ssh_run}"""
+        f""" "grep -q AWS_ACCESS_KEY_ID .bash_profile || echo \\"export AWS_DEFAULT_REGION='{r}';"""
+        f""" export AWS_SECRET_ACCESS_KEY='{s}';"""
+        f""" export AWS_ACCESS_KEY_ID='{a}';\\" """
+        """ >> .bash_profile " """
+    )
+
+    _run_command(cmd, capture_output=False)
+
+
+@dev.command(help="scp to the aws docker host.")
+@click.argument("local_file_path", type=click.Path(exists=True), required=True)
+@click.argument("remote_path", type=click.STRING, required=False)
+def scp(local_file_path, remote_path):
+    _scp(local_file_path, remote_path)
+
+
+def _scp(local_file_path, remote_path):
+    host = _running_ec2_docker_public_hostname()
+    user = EC2_USER
+    if not remote_path:
+        remote_path = ""
+    cmd = f"scp {local_file_path} {user}@{host}:{remote_path}"
     _run_command(cmd, capture_output=False)

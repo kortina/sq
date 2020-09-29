@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/bin/bash
 # bootstrap deps on ec2
 sudo apt-get -y update
 sudo apt-get -y install \

@@ -1,6 +1,7 @@
 import boto3
 import click
 import os
+import pathlib
 import re
 import subprocess
 import sys
@@ -8,6 +9,14 @@ import sys
 TF_CONTAINER = "sq_tf"
 PG_CONTAINER = "sq_pg"
 EC2_DOCKER_HOST_NAME_TAG = "docker-host"
+
+
+def _sq_root_path():
+    return pathlib.Path(__file__).parent.parent.absolute()
+
+
+def _sq_path_join(p):
+    return os.path.join(_sq_root_path(), p)
 
 
 def _aws_kwargs():
