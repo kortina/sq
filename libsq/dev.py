@@ -94,6 +94,9 @@ def bootstrap(full):
         """ >> .bash_profile " """
     )
     _ssh_run(cmd)
+    _ssh_run(
+        """ "grep -q docker-compose .bash_profile || echo \\" alias dk='docker-compose;' >> .bash_profile """
+    )
 
     if full:
         _ssh_run(" ./ec2-bootstrap.sh")

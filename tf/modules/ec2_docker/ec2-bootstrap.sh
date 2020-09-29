@@ -15,7 +15,7 @@ sudo add-apt-repository -y \
 sudo apt-get -y update
 sudo apt-get -y install docker-ce docker-ce-cli containerd.io
 sudo apt-get install -y docker-compose
-sudo apt-get install -y postgresql postgresql-contrib
+sudo apt-get install -y postgresql-client
 # so you can:
 # psql postgres://postgres:DaVinci@localhost:5432/ # on ec2
 
