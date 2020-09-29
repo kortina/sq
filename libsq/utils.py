@@ -1,3 +1,4 @@
+import boto3
 import click
 import os
 import re
@@ -6,24 +7,89 @@ import sys
 
 TF_CONTAINER = "sq_tf"
 PG_CONTAINER = "sq_pg"
+EC2_DOCKER_HOST_NAME_TAG = "docker-host"
+
+
+def _aws_kwargs():
+    e = os.environ.get
+    if _is_docker_container():
+        aws_access_key_id = e("AWS_ACCESS_KEY_ID")
+        aws_secret_access_key = e("AWS_SECRET_ACCESS_KEY")
+        region_name = e("AWS_DEFAULT_REGION")
+    else:
+        aws_access_key_id = e("SQ__AWS_ACCESS_KEY_ID")
+        aws_secret_access_key = e("SQ__AWS_SECRET_KEY")
+        region_name = e("SQ__AWS_DEFAULT_REGION")
+
+    return {
+        "aws_access_key_id": aws_access_key_id,
+        "aws_secret_access_key": aws_secret_access_key,
+        "region_name": region_name,
+    }
+
+
+def _aws_client(service):
+    return boto3.client(service, **_aws_kwargs())
+    # return Config(
+    #     region_name = 'us-west-2',
+    #     signature_version = 'v4',
+    #     retries = {
+    #         'max_attempts': 10,
+    #         'mode': 'standard'
+    #     }
+    # )
+
+
+def _running_ec2_docker_instance():
+    client = _aws_client("ec2")
+    d = client.describe_instances(
+        Filters=[
+            {"Name": "tag:Name", "Values": [EC2_DOCKER_HOST_NAME_TAG]},
+            {"Name": "instance-state-name", "Values": ["running"]},
+        ]
+    )
+    if len(d["Reservations"]) > 1:
+        raise ValueError(
+            f"More than one reservation matches name: {EC2_DOCKER_HOST_NAME_TAG}"
+        )
+    if len(d["Reservations"][0]["Instances"]) > 1:
+        raise ValueError(
+            f"More than one instance matches name: {EC2_DOCKER_HOST_NAME_TAG}"
+        )
+    return d["Reservations"][0]["Instances"][0]
+
+
+def _running_ec2_docker_public_hostname():
+    i = _running_ec2_docker_instance()
+    return i["PublicDnsName"]
+
+
+def _is_docker_container():
+    return os.path.exists("/.dockerenv")
 
 
 def _ensure_host():
-    if os.path.exists("/.dockerenv"):
+    if _is_docker_container():
         raise click.UsageError(
             "This command should only be run on the host, not in the docker container."
         )
 
 
 def _ensure_docker():
-    if not os.path.exists("/.dockerenv"):
+    if not _is_docker_container():
         raise click.UsageError(
             "This command should only be run in the docker container, ie,"
             " via some other sq command, not directly."
         )
 
 
-def _run_command(cmd, error_message=None, capture_output=False, hide_command=False):
+def _run_command(
+    cmd,
+    error_message=None,
+    capture_output=False,
+    hide_command=False,
+    decode_output=True,
+):
     # hide_command can be used to reduce the amount of output
     if not hide_command:
         click.secho("\n>> Running: {}\n".format(cmd), fg="green")
@@ -39,11 +105,16 @@ def _run_command(cmd, error_message=None, capture_output=False, hide_command=Fal
             sys.exit(code)
     else:
         try:
-            return subprocess.run(
+            p = subprocess.run(
                 cmd, shell=True, check=True, capture_output=capture_output
             )
         except subprocess.CalledProcessError as e:  # remote commands sometimes throw this
-            return subprocess.CompletedProcess(cmd, e.returncode, stderr=e.output)
+            p = subprocess.CompletedProcess(cmd, e.returncode, stderr=e.output)
+        # return this as a string you can actually work with:
+        if capture_output and decode_output:
+            return p.stdout.decode("utf-8").strip()
+        else:
+            return p
 
 
 def _docker_exec(cmd, inherit_env, container=TF_CONTAINER):

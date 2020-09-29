@@ -1,6 +1,11 @@
 import click
 from . import dev
-from .utils import _docker_exec, _ensure_host, _run_command
+from .utils import (
+    _docker_exec,
+    _ensure_host,
+    _run_command,
+    _running_ec2_docker_public_hostname,
+)
 
 
 @dev.command(help="Start bash in docker container, inheriting SQ__ prefixed env vars.")
@@ -28,10 +33,12 @@ def mk_opt_ebs():
 
 
 @dev.command(help="Tunnel to the aws docker pg db.")
-@click.argument("host", type=click.STRING, required=True)
-@click.option("--local-port", type=click.STRING, required=False)
-def tunnel(host, local_port="54320"):
-    # TODO: figure out how to query aws for the host
+@click.argument("host", type=click.STRING, required=False)
+@click.option("--local-port", type=click.STRING, required=False, default="54320")
+def tunnel(host=None, local_port="54320"):
+    if host is None:
+        host = _running_ec2_docker_public_hostname()
+
     user = "ubuntu"
     cmd = f"ssh -vvv -TnN -L {local_port}:0.0.0.0:5432 {user}@{host}"
-    _run_command(cmd)
+    _run_command(cmd, capture_output=False)
