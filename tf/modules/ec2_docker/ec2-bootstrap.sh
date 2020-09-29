@@ -19,12 +19,18 @@ sudo apt-get install -y postgresql-client
 # so you can:
 # psql postgres://postgres:DaVinci@localhost:5432/ # on ec2
 
-
 u=`whoami`
 sudo usermod -aG docker "$u"
 
-eval `ssh-agent`
-ssh-add sq_github_deploy_key
+# ensure keyfile is linked to github:
+test -e ~/.ssh || mkdir ~/.ssh
+touch ~/.ssh/config
+grep -q sq_github_deploy_key ~/.ssh/config || cat >> ~/.ssh/config <<-EOF
+Host github
+    Hostname github.com
+    IdentityFile ~/sq_github_deploy_key
+    IdentitiesOnly yes
+EOF
+
 git clone git@github.com:kortina/sq.git
 cd sq
-# docker-compose up -d

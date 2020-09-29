@@ -1,10 +1,6 @@
+- [ ] command to run the db import on aws docker instance
 - [ ] build pg docker container on aws
-  - [ ] use EBS as persistent state
-  - [ ] only port 22 open to web
-  - [ ] sq command to connect to this docker container in a bash shell
   - [ ] backups
-- [ ] sq command to forward aws pg to local port via ssh
-- [ ] s3 bucket in us-west-1
 - [ ] define project directory / bin structure (new project command)
 - [ ] s3 rsync scripts
 - [ ] https://github.com/kylemanna/docker-openvpn
