@@ -16,24 +16,13 @@ sudo apt-get -y update
 sudo apt-get -y install docker-ce docker-ce-cli containerd.io
 sudo apt-get install -y docker-compose
 sudo apt-get install -y postgresql postgresql-contrib
+# so you can:
 # psql postgres://postgres:DaVinci@localhost:5432/ # on ec2
 
-sudo mkdir -p /opt/ebs
-sudo chown -R ubuntu:ubuntu /opt/ebs
-exit
-# https://github.com/hashicorp/terraform/issues/2957
-sudo mount /dev/xvdf /opt/ebs
-mkdir -p /opt/ebs/pgdata
 
 u=`whoami`
 sudo usermod -aG docker "$u"
 
-exit # and re-ssh
-# on mac host
-# host=""
-# scp ~/.ssh/sq_github_deploy_key ubuntu@"$host"
-
-# sudo file -s /dev/xvdf
 eval `ssh-agent`
 ssh-add sq_github_deploy_key
 git clone git@github.com:kortina/sq.git

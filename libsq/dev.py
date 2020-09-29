@@ -66,7 +66,10 @@ def ssh():
 
 
 @dev.command(help="pre bootstrap.")
-def pre_bootstrap():
+@click.option(
+    "--full", is_flag=True, help="Execute ec2-bootstrap.sh and ec2-mount-vol.sh"
+)
+def bootstrap(full):
     home = os.environ.get("HOME")
     _scp(f"{home}/.ssh/sq_github_deploy_key", None)
     _scp(_sq_path_join("tf/modules/ec2_docker/ec2-bootstrap.sh"), None)
@@ -79,18 +82,29 @@ def pre_bootstrap():
     s = k["aws_secret_access_key"]
     a = k["aws_access_key_id"]
 
-    ssh_run = f"""ssh {user}@{host}"""
-    _run_command(f"{ssh_run} touch .bash_profile", capture_output=False)
+    def _ssh_run(cmd):
+        _run_command(f"ssh {user}@{host} {cmd}", capture_output=False)
+
+    _ssh_run("touch .bash_profile")
 
     cmd = (
-        f"""{ssh_run}"""
         f""" "grep -q AWS_ACCESS_KEY_ID .bash_profile || echo \\"export AWS_DEFAULT_REGION='{r}';"""
         f""" export AWS_SECRET_ACCESS_KEY='{s}';"""
         f""" export AWS_ACCESS_KEY_ID='{a}';\\" """
         """ >> .bash_profile " """
     )
+    _ssh_run(cmd)
 
-    _run_command(cmd, capture_output=False)
+    if full:
+        _ssh_run(" ./ec2-bootstrap.sh")
+        _ssh_run(" ./ec2-mount-vol.sh")
+        _ssh_run("mv YOU_MUST_RUN_BOOTSTRAP .RAN_BOOTSTRAP")
+        print("Now you can:\ncd sq && docker-compose up -d")
+        print("NB: if you get the error:")
+        print(
+            "-- ERROR: Couldn't connect to Docker daemon at http+docker://localhost - is it running? --"
+        )
+        print("Logout, and re-ssh in.")
 
 
 @dev.command(help="scp to the aws docker host.")
