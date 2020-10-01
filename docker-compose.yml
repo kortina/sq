@@ -17,7 +17,6 @@ services:
       - /opt/ebs:/opt/ebs:cached
       - ./:/workspace:cached
       # /host/path:/container/path
-    user: postgres:root
     environment:
       - POSTGRES_DB=cyberpunk202x
       - POSTGRES_USER=postgres
