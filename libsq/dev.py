@@ -11,8 +11,9 @@ from .utils import (
 )
 
 EC2_USER = "ubuntu"  # ec2-user for Amazon Linux
-EBS_PATH = "/opt/pgdata"
+EBS_PATH = "/opt/ebs"
 PGDATA_PATH = f"{EBS_PATH}/pgdata"
+PG_LOG_PATH = f"{EBS_PATH}/pgdata/pg_log"
 
 
 @dev.command(help="Start bash in docker container, inheriting SQ__ prefixed env vars.")
@@ -32,13 +33,26 @@ def tail_davinci(lines):
     _run_command(cmd)
 
 
+def _tail_pg_cmd(lines=None):
+    n = f"-n {lines} " if lines else ""
+    return f"ls -d {PG_LOG_PATH}/* | tail -n 1 | xargs tail {n} -f"
+
+
 @dev.command(help="Tail the pg log on host.")
 @click.argument("lines", type=int, required=False)
 def tail_pg(lines):
     _ensure_host()
-    n = f"-n {lines} " if lines else ""
-    cmd = f"ls -d /opt/ebs/pgdata/pg_log/* | tail -n 1 | xargs tail {n} -f"
+    cmd = _tail_pg_cmd
     _run_command(cmd)
+
+
+@dev.command(help="Tail the pg log on ec2.")
+@click.argument("lines", type=int, required=False)
+def tail_pg_ec2(lines):
+    _ensure_host()
+    cmd = _tail_pg_cmd()
+    _ssh_run(f"sudo chmod 755 {PG_LOG_PATH}")
+    _ssh_run(f"'{cmd}'")
 
 
 @dev.command(help=f"Create mac host {PGDATA_PATH}")
@@ -76,6 +90,18 @@ def ssh():
     _run_command(cmd, capture_output=False)
 
 
+# if running multiple times
+# you should set user and host yourself
+# and pass them as args
+# rather than doing the _running_ec2_docker_public_hostname check every time
+def _ssh_run(cmd, user=None, host=None):
+    if user is None:
+        user = EC2_USER
+    if host is None:
+        host = _running_ec2_docker_public_hostname()
+    _run_command(f"ssh {user}@{host} {cmd}", capture_output=False)
+
+
 @dev.command(help="pre bootstrap.")
 @click.option(
     "--full", is_flag=True, help="Execute ec2-bootstrap.sh and ec2-mount-vol.sh"
@@ -93,10 +119,7 @@ def bootstrap(full):
     s = k["aws_secret_access_key"]
     a = k["aws_access_key_id"]
 
-    def _ssh_run(cmd):
-        _run_command(f"ssh {user}@{host} {cmd}", capture_output=False)
-
-    _ssh_run("touch .bash_profile")
+    _ssh_run("touch .bash_profile", user, host)
 
     cmd = (
         f""" "grep -q AWS_ACCESS_KEY_ID .bash_profile || echo \\"export AWS_DEFAULT_REGION='{r}';"""
@@ -104,15 +127,17 @@ def bootstrap(full):
         f""" export AWS_ACCESS_KEY_ID='{a}';\\" """
         """ >> .bash_profile " """
     )
-    _ssh_run(cmd)
+    _ssh_run(cmd, user, host)
     _ssh_run(
-        """ "grep -q docker-compose .bash_profile || echo \\"alias dk='docker-compose;' >> .bash_profile """
+        """ "grep -q docker-compose .bash_profile || echo \\"alias dk='docker-compose;' >> .bash_profile """,
+        user,
+        host,
     )
 
     if full:
-        _ssh_run(" ./ec2-bootstrap.sh")
-        _ssh_run(" ./ec2-mount-vol.sh")
-        _ssh_run("mv YOU_MUST_RUN_BOOTSTRAP .RAN_BOOTSTRAP")
+        _ssh_run(" ./ec2-bootstrap.sh", user, host)
+        _ssh_run(" ./ec2-mount-vol.sh", user, host)
+        _ssh_run("mv YOU_MUST_RUN_BOOTSTRAP .RAN_BOOTSTRAP", user, host)
         print("Now you can:\ncd sq && docker-compose up -d")
         print("NB: if you get the error:")
         print(

@@ -57,6 +57,19 @@ def restore(dbname, dumpfile):
     _docker_exec(f"./sq docker pg-restore {dbname} {dumpfile}", True)
 
 
+@pg.command(help="restore db.")
+@click.argument("dbname", type=click.STRING, required=True)
+@click.argument("dumpfile", type=click.Path(exists=True), required=True)
+def restore_ec2(dbname, dumpfile):
+    # sq dev scp cyberpunk202x.dump.sql
+    # ssh run:
+    # cd ~/sq
+    # mv ../___________sql ./
+    # ./sq pg restore cyberpunk202x cyberpunk202x.dump.sql
+    raise Exception("NOT_IMPLEMENTED")
+    # _docker_exec(f"./sq docker pg-restore {dbname} {dumpfile}", True)
+
+
 @pg.command(help="Stop the Mac DaVinci db (to free port 5432).")
 def stop_mac():
     _ensure_host()
