@@ -33,9 +33,10 @@ def tail_davinci(lines):
     _run_command(cmd)
 
 
-def _tail_pg_cmd(lines=None):
+def _tail_pg_cmd(lines=None, sudo=False):
+    s = "sudo" if sudo else ""
     n = f"-n {lines} " if lines else ""
-    return f"ls -d {PG_LOG_PATH}/* | tail -n 1 | xargs tail {n} -f"
+    return f"{s} ls -d {PG_LOG_PATH}/* | tail -n 1 | xargs {s} tail {n} -f"
 
 
 @dev.command(help="Tail the pg log on host.")
@@ -51,7 +52,7 @@ def tail_pg(lines):
 def tail_pg_ec2(lines):
     _ensure_host()
     cmd = _tail_pg_cmd()
-    _ssh_run(f"sudo chmod 755 {PG_LOG_PATH}")
+    _ssh_run(f"sudo chmod -R 755 {EBS_PATH}")
     _ssh_run(f"'{cmd}'")
 
 
