@@ -15,12 +15,15 @@ services:
     restart: always
     volumes:
       - /opt/ebs:/opt/ebs:cached
+      - ./:/workspace:cached
       # /host/path:/container/path
+    user: postgres:root
     environment:
       - POSTGRES_DB=cyberpunk202x
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=DaVinci
       - PGDATA=/opt/ebs/pgdata
+    command: postgres -c config_file=/workspace/pg/postgresql.conf
   sq_tf:
     container_name: sq_tf
     build: ./tf

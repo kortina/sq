@@ -4,9 +4,11 @@
         "davinci",
         "dbname",
         "dockerenv",
+        "entrypoint",
         "libsq",
         "pgdata",
         "postgres",
+        "postgresql",
         "rsync",
         "secho",
         "tfplan"

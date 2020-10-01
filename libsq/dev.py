@@ -10,7 +10,9 @@ from .utils import (
     _sq_path_join,
 )
 
-EC2_USER = "ubuntu"  # ec2-user
+EC2_USER = "ubuntu"  # ec2-user for Amazon Linux
+EBS_PATH = "/opt/pgdata"
+PGDATA_PATH = f"{EBS_PATH}/pgdata"
 
 
 @dev.command(help="Start bash in docker container, inheriting SQ__ prefixed env vars.")
@@ -30,9 +32,18 @@ def tail_davinci(lines):
     _run_command(cmd)
 
 
-@dev.command(help="Create mac host /opt/ebs")
+@dev.command(help="Tail the pg log on host.")
+@click.argument("lines", type=int, required=False)
+def tail_pg(lines):
+    _ensure_host()
+    n = f"-n {lines} " if lines else ""
+    cmd = f"ls -d /opt/ebs/pgdata/pg_log/* | tail -n 1 | xargs tail {n} -f"
+    _run_command(cmd)
+
+
+@dev.command(help=f"Create mac host {PGDATA_PATH}")
 def mk_opt_ebs():
-    p = "/opt/ebs/pgdata"
+    p = PGDATA_PATH
     _run_command(f"sudo mkdir -p {p}")
     _run_command(f'sudo chown -R "`id -u -n`":staff {p}')
 
