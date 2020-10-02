@@ -25,20 +25,19 @@ sudo ln -s /usr/bin/python3 /usr/bin/python
 u=`whoami`
 sudo usermod -aG docker "$u"
 
-# ensure keyfile is linked to github:
-test -e ~/.ssh || mkdir ~/.ssh
-touch ~/.ssh/config
-# for some reason git does not seem to respect this:
-grep -q sq_github_deploy_key ~/.ssh/config || cat >> ~/.ssh/config <<-EOF
-Host github.com
-    HostName github.com
-    IdentityFile ~/sq_github_deploy_key
-    IdentitiesOnly yes
+# Create the bash profile:
+cat << EOF > ~/.bash_profile
+alias dk='docker-compose' 
+source ~/.aws
+export GIT_SSH_COMMAND='ssh -i ~/sq_github_deploy_key'
+export PGDATA=/opt/ebs/pg95
+export PGLOGFILE=/opt/ebs/pg95.log
+export PGCONF=/home/ubuntu/sq/pg/postgresql95.conf
+export PG_CTL="/usr/lib/postgresql/9.5/bin/pg_ctl"
+export PATH="\$PATH:/usr/lib/postgresql/9.5/bin:~/sq:~/sq/pg"
 EOF
-# so also just do this:
-export_ssh_command="export GIT_SSH_COMMAND='ssh -i ~/sq_github_deploy_key'"
-grep -q GIT_SSH_COMMAND ~/.bash_profile || echo "$export_ssh_command" >> ~/.bash_profile
-eval "$export_ssh_command"
+
+source ~/.bash_profile
 
 git clone git@github.com:kortina/sq.git
 cd sq

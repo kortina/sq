@@ -120,31 +120,27 @@ def bootstrap(full):
     s = k["aws_secret_access_key"]
     a = k["aws_access_key_id"]
 
-    _ssh_run("touch .bash_profile", user, host)
+    _ssh_run("touch .aws", user, host)
 
     cmd = (
-        f""" "grep -q AWS_ACCESS_KEY_ID .bash_profile || echo \\"export AWS_DEFAULT_REGION='{r}';"""
+        f""" "grep -q AWS_ACCESS_KEY_ID .aws || echo \\"export AWS_DEFAULT_REGION='{r}';"""
         f""" export AWS_SECRET_ACCESS_KEY='{s}';"""
         f""" export AWS_ACCESS_KEY_ID='{a}';\\" """
-        """ >> .bash_profile " """
+        """ >> .aws " """
     )
     _ssh_run(cmd, user, host)
-    _ssh_run(
-        """ "grep -q docker-compose .bash_profile || echo \\"alias dk='docker-compose;' >> .bash_profile """,
-        user,
-        host,
-    )
 
     if full:
         _ssh_run(" ./ec2-bootstrap.sh", user, host)
         _ssh_run(" ./ec2-mount-vol.sh", user, host)
+        _ssh_run(" ./pg/ec2-pg-bootstrap.sh", user, host)
         _ssh_run("mv YOU_MUST_RUN_BOOTSTRAP .RAN_BOOTSTRAP", user, host)
-        print("Now you can:\ncd sq && docker-compose up -d")
-        print("NB: if you get the error:")
-        print(
-            "-- ERROR: Couldn't connect to Docker daemon at http+docker://localhost - is it running? --"
-        )
-        print("Logout, and re-ssh in.")
+        # print("Now you can:\ncd sq && docker-compose up -d")
+        # print("NB: if you get the error:")
+        # print(
+        #     "-- ERROR: Couldn't connect to Docker daemon at http+docker://localhost - is it running? --"
+        # )
+        # print("Logout, and re-ssh in.")
 
 
 @dev.command(help="scp to the aws docker host.")
