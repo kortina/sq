@@ -30,8 +30,8 @@ cat << EOF > ~/.bash_profile
 alias dk='docker-compose' 
 source ~/.aws
 export GIT_SSH_COMMAND='ssh -i ~/sq_github_deploy_key'
-export PGDATA=/opt/ebs/pg95
-export PGLOGFILE=/opt/ebs/pg95.log
+export PGDATA=/opt/ebs/pgdata
+export PGLOG=/opt/ebs/pg_log
 export PGCONF=/home/ubuntu/sq/pg/postgresql95.conf
 export PG_CTL="/usr/lib/postgresql/9.5/bin/pg_ctl"
 export PATH="\$PATH:/usr/lib/postgresql/9.5/bin:~/sq:~/sq/pg"

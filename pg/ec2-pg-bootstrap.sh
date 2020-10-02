@@ -13,6 +13,7 @@ sudo apt-get update
 sudo apt-get -y install postgresql-9.5 postgresql-contrib-9.5
 
 mkdir -p $PGDATA
+mkdir -p $PGLOG
 sudo chown -R postgres:ubuntu $PGDATA
-sudo chown postgres:ubuntu $PGLOGFILE
+sudo chown postgres:ubuntu $PGLOG
 sudo su - postgres -c "$PG_CTL -D $PGDATA initdb -U postgres -W"
