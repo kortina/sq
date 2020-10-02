@@ -13,7 +13,7 @@ from .utils import (
 EC2_USER = "ubuntu"  # ec2-user for Amazon Linux
 EBS_PATH = "/opt/ebs"
 PGDATA_PATH = f"{EBS_PATH}/pgdata"
-PG_LOG_PATH = f"{EBS_PATH}/pgdata/pg_log"
+PG_LOG_PATH = f"{EBS_PATH}/pg_log"
 
 
 @dev.command(help="Start bash in docker container, inheriting SQ__ prefixed env vars.")
