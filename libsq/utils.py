@@ -1,5 +1,6 @@
 import boto3
 import click
+
 import os
 import pathlib
 import re
@@ -9,6 +10,23 @@ import sys
 TF_CONTAINER = "sq_tf"
 PG_CONTAINER = "sq_pg"
 EC2_DOCKER_HOST_NAME_TAG = "docker-host"
+EC2_USER = "ubuntu"  # ec2-user for Amazon Linux
+EBS_PATH = "/opt/ebs"
+S3_PATH = "/opt/s3"
+S3_PROJECTS_PATH = "/opt/s3/projects"
+PGDATA_PATH = f"{EBS_PATH}/pgdata"
+PG_LOG_PATH = f"{EBS_PATH}/pg_log"
+S3_BUCKET = "sq-us-west-1"
+PROJECT_DIRS = [
+    "clips-audio",
+    "clips-video",  # for youtube-dl etc.
+    "exports",
+    "films",  # for films referenced
+    "gallery",  # for DaVinci
+    "live-audio",
+    "live-video",
+    "music",
+]
 
 
 def _sq_root_path():
@@ -35,6 +53,13 @@ def _aws_kwargs():
         "aws_secret_access_key": aws_secret_access_key,
         "region_name": region_name,
     }
+
+
+def _aws_env_string():
+    k = _aws_kwargs()
+    return "AWS_ACCESS_KEY_ID='{}' AWS_SECRET_ACCESS_KEY='{}' AWS_DEFAULT_REGION='{}'".format(
+        k["aws_access_key_id"], k["aws_secret_access_key"], k["region_name"],
+    )
 
 
 def _aws_client(service):
@@ -153,4 +178,58 @@ def _env_vars(inherit_env):
 def _ssh_add():
     home = os.environ.get("HOME")
     ssh_key_path = f"{home}/.ssh/sq_aws.pem"
-    _run_command(f"ssh-add {ssh_key_path}")
+    _run_command(f"ssh-add {ssh_key_path}", capture_output=True, hide_command=True)
+
+
+# if running multiple times
+# you should set user and host yourself
+# and pass them as args
+# rather than doing the _running_ec2_docker_public_hostname check every time
+def _ssh_run(cmd, user=None, host=None):
+    if user is None:
+        user = EC2_USER
+    if host is None:
+        host = _running_ec2_docker_public_hostname()
+    _ssh_add()
+    _run_command(
+        f"ssh {user}@{host} 'source .bash_profile && {cmd}'", capture_output=False
+    )
+
+
+def _s3_local_project_path(project):
+    return f"{S3_PROJECTS_PATH}/{project}"
+
+
+def _s3_bucket_project_url(project):
+    return f"s3://{S3_BUCKET}/projects/{project}"
+
+
+def _validate_project(project):
+    if not re.search(r"^[\w\-_]+$", project):
+        raise ValueError("Invalid project name.")
+
+
+def _duck(cmd, project):
+    _validate_project(project)
+    flags = " --existing=compare"
+    if cmd == "upload":
+        local = _s3_local_project_path(project)
+        remote = f"  s3:{S3_BUCKET}/projects/{project}"
+    elif cmd == "download":
+        local = S3_PROJECTS_PATH
+        remote = f"  s3:{S3_BUCKET}/projects/{project}/"  # need trailing slash
+    else:
+        raise Exception(f"{cmd} NOT_IMPLEMENTED")
+
+    cmd = (
+        "duck"
+        " -v"
+        ' --username="$SQ__AWS_ACCESS_KEY_ID"'
+        ' --password="$SQ__AWS_SECRET_KEY"'
+        f" {flags}"
+        f" --{cmd}"
+        f" {remote}"
+        f" {local}"
+        f" | rg 'Uploading|Downloading'"
+    )
+    _run_command(cmd)

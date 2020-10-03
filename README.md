@@ -1,6 +1,9 @@
 ### Getting Started
 
 ```sh
+brew install duck
+pip install click boto3
+
 dk up --build
 
 export SQ__ ....

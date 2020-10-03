@@ -11,6 +11,7 @@
         "postgresql",
         "rsync",
         "secho",
-        "tfplan"
+        "tfplan",
+        "xargs"
     ]
 }

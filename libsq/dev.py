@@ -1,21 +1,28 @@
 import click
+import getpass
 import os
 from . import dev
 from .utils import (
     _aws_kwargs,
     _docker_exec,
+    _duck,
     _ensure_host,
     _run_command,
     _running_ec2_docker_public_hostname,
+    _s3_local_project_path,
     _ssh_add,
+    _ssh_run,
     _sq_path_join,
+    _validate_project,
+    EBS_PATH,
+    EC2_USER,
+    PGDATA_PATH,
+    PG_LOG_PATH,
+    PROJECT_DIRS,
+    S3_PATH,
+    S3_PROJECTS_PATH,
 )
-from .pg import mac_down
-
-EC2_USER = "ubuntu"  # ec2-user for Amazon Linux
-EBS_PATH = "/opt/ebs"
-PGDATA_PATH = f"{EBS_PATH}/pgdata"
-PG_LOG_PATH = f"{EBS_PATH}/pg_log"
+from .pg import mac_down, ec2_dump
 
 
 @dev.command(help="Start bash in docker container, inheriting SQ__ prefixed env vars.")
@@ -55,7 +62,7 @@ def tail_pg_ec2(lines):
     _ensure_host()
     cmd = _tail_pg_cmd()
     _ssh_run(f"sudo chmod -R 755 {EBS_PATH}")
-    _ssh_run(f"'{cmd}'")
+    _ssh_run(f"{cmd}")
 
 
 @dev.command(help=f"Create mac host {PGDATA_PATH}")
@@ -79,6 +86,9 @@ def tunnel(ctx, host=None, local_port=None, print_only=None):
     if host is None:
         host = _running_ec2_docker_public_hostname()
 
+    # dump a backup first
+    ctx.invoke(ec2_dump)
+
     user = EC2_USER
     info = "---------------- local_port:remote_addr:remote_port remote_user@remote_host ----------------"
     cmd = f"ssh -vvv -TnN -L {local_port}:0.0.0.0:5432 {user}@{host}"
@@ -95,18 +105,6 @@ def ssh():
     user = EC2_USER
     cmd = f"ssh {user}@{host}"
     _run_command(cmd, capture_output=False)
-
-
-# if running multiple times
-# you should set user and host yourself
-# and pass them as args
-# rather than doing the _running_ec2_docker_public_hostname check every time
-def _ssh_run(cmd, user=None, host=None):
-    if user is None:
-        user = EC2_USER
-    if host is None:
-        host = _running_ec2_docker_public_hostname()
-    _run_command(f"ssh {user}@{host} {cmd}", capture_output=False)
 
 
 @dev.command(help="pre bootstrap.")
@@ -163,3 +161,50 @@ def _scp(local_file_path, remote_path):
         remote_path = ""
     cmd = f"scp {local_file_path} {user}@{host}:{remote_path}"
     _run_command(cmd, capture_output=False)
+
+
+@dev.command(help="Init project directory on mac host in /opt/s3/projects")
+@click.argument("project", type=click.STRING, required=True)
+@click.pass_context
+def project_init(ctx, project):
+    _validate_project(project)
+    u = getpass.getuser()
+    s3_path = S3_PATH
+    _run_command(
+        f"test -e {s3_path} || ( sudo mkdir {s3_path} && sudo chown -R {u}:staff {s3_path} )"
+    )
+    p = S3_PROJECTS_PATH
+    _run_command(f"test -e {p} || mkdir {p}")
+    project_path = _s3_local_project_path(project)
+    p = project_path
+    _run_command(f"test -e {p} || mkdir {p}")
+    for d in PROJECT_DIRS:
+        p = f"{project_path}/{d}"
+        _run_command(f"test -e {p} || mkdir {p}")
+        _run_command(f"touch {p}/.touch")
+    ctx.invoke(s3_up)
+
+
+@dev.command(help="Push local up to s3.")
+@click.argument("project", type=click.STRING, required=True)
+def s3_up(project):
+    # local = _s3_local_project_path(project)
+    # e = _aws_env_string()
+    # b = _s3_bucket_project_url(project)
+    # The following sync command syncs objects under a specified prefix and
+    # bucket to files in a local directory by uploading the local files to s3.
+    # A local file will require uploading if the size of the local file is
+    # different than the size of the s3 object, the last modified time of the
+    # local file is newer than the last modified time of the s3 object, or the
+    # local file does not exist under the specified bucket and prefix.
+    #
+    # WARNING: s3 sync will overwrite newer target files with older source files!
+    # DON'T USE IT
+    # _run_command(f"{e} aws s3 sync {local} {b}")
+    _duck("upload", project)
+
+
+@dev.command(help="Download s3 to local.")
+@click.argument("project", type=click.STRING, required=True)
+def s3_down(project):
+    _duck("download", project)

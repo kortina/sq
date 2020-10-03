@@ -17,7 +17,7 @@ sudo apt-get -y install docker-ce docker-ce-cli containerd.io
 sudo apt-get install -y docker-compose
 sudo apt-get install -y postgresql-client
 sudo apt-get install -y python3 python3-pip
-sudo pip3 install boto3 click ipython
+sudo pip3 install -U awscli boto3 click ipython
 sudo ln -s /usr/bin/python3 /usr/bin/python
 # so you can:
 # psql postgres://postgres:DaVinci@localhost:5432/ # on ec2
@@ -38,5 +38,6 @@ export PATH="\$PATH:/usr/lib/postgresql/9.5/bin:~/sq:~/sq/pg"
 EOF
 source ~/.bash_profile
 
+mkdir db
 git clone git@github.com:kortina/sq.git
 cd sq

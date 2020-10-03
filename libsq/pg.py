@@ -1,11 +1,16 @@
 import click
+import datetime
 from . import docker, pg, HOST_MAC_IP
 from .utils import (
     _docker_exec,
     _ensure_docker,
     _ensure_host,
     _run_command,
+    _running_ec2_docker_public_hostname,
+    _ssh_run,
+    EC2_USER,
     PG_CONTAINER,
+    S3_BUCKET,
 )
 
 HOST_MAC_PG_CTL = "/Library/PostgreSQL/9.5/bin/pg_ctl "
@@ -83,3 +88,21 @@ def mac_up():
     # TODO: this may require some additional flags
     cmd = "sudo -u postgres" f" {HOST_MAC_PG_CTL}" " start" f" -D {HOST_MAC_DATA}"
     _run_command(cmd)
+
+
+@pg.command(help="backup all ec2 dbs in cluster to s3")
+def ec2_dump():
+    # TODO: we could also backup just a single project db here...
+    user = EC2_USER
+    host = _running_ec2_docker_public_hostname()
+    n = datetime.datetime.now()
+    d = n.strftime("%Y-%m-%d--%H-%M-%S")
+    fn = f"cluster-{d}.sql"
+    local_path = f"db/{fn}"
+    cmd = f"pg_dumpall -U postgres | gzip > {local_path}"
+    _ssh_run(cmd, user=user, host=host)
+
+    d = n.strftime("%Y/%m/%d")
+    s3_path = f"s3://{S3_BUCKET}/backups/{d}/{fn}"
+    cmd = f"aws s3 cp {local_path} {s3_path} && rm {local_path}"
+    _ssh_run(cmd, user=user, host=host)
