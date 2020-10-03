@@ -71,14 +71,14 @@ def restore_ec2(dbname, dumpfile):
 
 
 @pg.command(help="Stop the Mac DaVinci db (to free port 5432).")
-def stop_mac():
+def mac_down():
     _ensure_host()
     cmd = "sudo -u postgres" f" {HOST_MAC_PG_CTL}" " stop" f" -D {HOST_MAC_DATA}"
     _run_command(cmd)
 
 
 @pg.command(help="Start the Mac DaVinci db.")
-def start_mac():
+def mac_up():
     _ensure_host()
     # TODO: this may require some additional flags
     cmd = "sudo -u postgres" f" {HOST_MAC_PG_CTL}" " start" f" -D {HOST_MAC_DATA}"

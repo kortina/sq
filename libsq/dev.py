@@ -7,8 +7,10 @@ from .utils import (
     _ensure_host,
     _run_command,
     _running_ec2_docker_public_hostname,
+    _ssh_add,
     _sq_path_join,
 )
+from .pg import mac_down
 
 EC2_USER = "ubuntu"  # ec2-user for Amazon Linux
 EBS_PATH = "/opt/ebs"
@@ -69,7 +71,11 @@ def mk_opt_ebs():
 @click.option(
     "--print-only", is_flag=True, help="Print cmd (for sending to someone else)."
 )
-def tunnel(host=None, local_port=None, print_only=None):
+@click.pass_context
+def tunnel(ctx, host=None, local_port=None, print_only=None):
+    ctx.allow_extra_args = True
+    ctx.invoke(mac_down)
+    _ssh_add()
     if host is None:
         host = _running_ec2_docker_public_hostname()
 

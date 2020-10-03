@@ -148,3 +148,9 @@ def _env_vars(inherit_env):
                 args.append('-e AWS_SECRET_ACCESS_KEY="${0}"'.format(k))
 
     return " ".join(args)
+
+
+def _ssh_add():
+    home = os.environ.get("HOME")
+    ssh_key_path = f"{home}/.ssh/sq_aws.pem"
+    _run_command(f"ssh-add {ssh_key_path}")
