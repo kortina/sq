@@ -182,7 +182,7 @@ def project_init(ctx, project):
         p = f"{project_path}/{d}"
         _run_command(f"test -e {p} || mkdir {p}")
         _run_command(f"touch {p}/.touch")
-    ctx.invoke(s3_up)
+    ctx.invoke(s3_up, project=project)
 
 
 @dev.command(help="Push local up to s3.")
