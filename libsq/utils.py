@@ -1,11 +1,19 @@
 import boto3
+from boto3.s3.transfer import TransferConfig
 import click
-
-import os
+from dataclasses import dataclass
+import datetime
+import hashlib
+from mimetypes import guess_type
 import pathlib
+import pytz
+import os
 import re
+import shutil
 import subprocess
 import sys
+import threading
+
 
 TF_CONTAINER = "sq_tf"
 PG_CONTAINER = "sq_pg"
@@ -27,6 +35,95 @@ PROJECT_DIRS = [
     "live-video",
     "music",
 ]
+
+MULTIPART_THRESHOLD = 1024 * 1024 * 100  # 100mb
+MULTIPART_CHUNKSIZE = 1024 * 1024 * 100  # 100mb
+TRANSFER_CONFIG = TransferConfig(
+    multipart_threshold=MULTIPART_THRESHOLD,
+    max_concurrency=10,
+    multipart_chunksize=MULTIPART_CHUNKSIZE,
+    use_threads=True,
+)
+
+
+@dataclass(frozen=True)
+class S3File:
+    key: str
+    last_modified: datetime.datetime
+    etag: str
+    size: int
+    storage_class: str
+
+    @property
+    def local_path(self):
+        return _local_from(self.key)
+
+    @property
+    def tmp_local_path(self):
+        return os.path.join("/tmp", _local_from(self.key).strip("/"))
+
+    def should_replace_local(self):
+        # local does not exist, so download
+        if not os.path.exists(self.local_path):
+            return True
+        loc = LocalFile.from_path(self.local_path)
+        # same md5 checksum, so no replace
+        if self.etag == loc.etag or self.etag == loc.md5:
+            return False
+        # diff md5, so only replace if remote is newer
+        if False:
+            print(f"l: {loc.last_modified}")
+            print(f"r: {self.last_modified}")
+        return self.last_modified > loc.last_modified
+
+
+@dataclass(frozen=True)
+class LocalFile:
+    key: str
+    local_path: str
+    last_modified: datetime.datetime
+    etag: str
+    md5: str
+    size: int
+    mime_type: str
+
+    @classmethod
+    def from_path(cls, local_path):
+        d = datetime.datetime.utcfromtimestamp(os.path.getmtime(local_path))
+
+        d_tz = datetime.datetime(
+            year=d.year,
+            month=d.month,
+            day=d.day,
+            hour=d.hour,
+            minute=d.minute,
+            second=d.second,
+            tzinfo=pytz.UTC,
+        )
+        # calculate md5 and size only on init:
+        return LocalFile(
+            key=_remote_from(local_path),
+            local_path=local_path,
+            last_modified=d_tz,
+            etag=calculate_multipart_etag(local_path, MULTIPART_CHUNKSIZE).strip('"'),
+            md5=hashlib.md5(open(local_path, "rb").read()).hexdigest().strip('"'),
+            size=int(os.path.getsize(local_path)),
+            mime_type=guess_type(local_path)[0],
+        )
+
+    def should_replace_remote(self, remote_ix):
+        r = remote_ix.get(self.key, None)
+        # does not exist on remote
+        if r is None:
+            return True
+        # same md5 checksum, so no replace
+        if self.etag == r.etag or self.md5 == r.etag:
+            return False
+        # diff md5, so only replace if local is newer
+        if False:
+            print(f"l: {self.last_modified}")
+            print(f"r: {r.last_modified}")
+        return self.last_modified > r.last_modified
 
 
 def _sq_root_path():
@@ -233,3 +330,194 @@ def _duck(cmd, project):
         f" | rg 'Uploading|Downloading'"
     )
     _run_command(cmd)
+
+
+def _remote_ix(client, bucket, project):
+    project_prefix = f"projects/{project}"
+    remote_ix = {}
+    paginator = client.get_paginator("list_objects_v2")
+    page_iterator = paginator.paginate(Bucket=bucket, Prefix=project_prefix)
+    for page in page_iterator:
+        for o in page["Contents"]:
+            s3f = S3File(
+                key=o["Key"],
+                last_modified=o["LastModified"],
+                etag=o["ETag"].strip('"'),
+                size=o["Size"],
+                storage_class=o["StorageClass"],
+            )
+            remote_ix[s3f.key] = s3f
+    return remote_ix
+
+
+def _sq_s3_xfer(cmd, project):
+    _validate_project(project)
+    client = _aws_client("s3")
+    remote_ix = _remote_ix(client, S3_BUCKET, project)
+    local_project_path = _s3_local_project_path(project)
+
+    if cmd == "upload":
+        for subdir, dirs, files in os.walk(local_project_path):
+            for file in files:
+
+                # skip DS_STORE files
+                if re.search(r"\.DS_Store$", file):
+                    continue
+                loc = LocalFile.from_path(os.path.join(subdir, file))
+                should_replace = loc.should_replace_remote(remote_ix)
+                if should_replace:
+                    print(f"UP  : {loc.local_path}")
+                    _upload(client, loc)
+                else:
+                    print(f"skip: {loc.local_path}")
+
+    elif cmd == "download":
+        for key, s3_file in remote_ix.items():
+            should_replace = s3_file.should_replace_local()
+            if should_replace:
+                print(f"DOWN: {s3_file.key}")
+                _download(client, s3_file)
+            else:
+                print(f"skip: {s3_file.key}")
+    else:
+        raise Exception(f"{cmd} NOT_IMPLEMENTED")
+
+
+# /opt/s3/projects/can-we-survive-technology/clips-video/.touch
+# ->
+# projects/can-we-survive-technology/clips-video/.touch
+def _remote_from(local: str):
+    rx = re.compile(S3_PATH)
+    # remove /opt/s3
+    remote = re.sub(rx, "", local)
+    # remove leading slash
+    remote = re.sub("^/", "", remote)
+    return remote
+
+
+# projects/can-we-survive-technology/clips-video/.touch
+# ->
+# /opt/s3/projects/can-we-survive-technology/clips-video/.touch
+def _local_from(remote: str):
+    return f"{S3_PATH}/{remote}"
+
+
+def _download(client, s3_file):
+    tmp_dir = os.path.dirname(s3_file.tmp_local_path)
+    os.makedirs(tmp_dir, exist_ok=True)
+
+    size = (
+        client.head_object(Bucket=S3_BUCKET, Key=s3_file.key).get("ContentLength", None)
+        or 1
+    )
+
+    client.download_file(
+        S3_BUCKET,
+        s3_file.key,
+        s3_file.tmp_local_path,
+        Config=TRANSFER_CONFIG,
+        Callback=ProgressPercentage(s3_file.key, size),
+    )
+    # add a newline since we have been flushing stdout:
+    print("")
+    shutil.move(s3_file.tmp_local_path, s3_file.local_path)
+
+
+def _upload(client, local_file):
+    x = {}
+    # x["MetaData"] = {"Content-MD5": local_file.etag}
+    if local_file.mime_type:
+        x["ContentType"] = local_file.mime_type
+        # , "ETag": local_file.etag
+
+    client.upload_file(
+        local_file.local_path,
+        S3_BUCKET,
+        local_file.key,
+        Config=TRANSFER_CONFIG,
+        Callback=ProgressPercentage(local_file.local_path, local_file.size),
+        ExtraArgs=x,
+    )
+    # add a newline since we have been flushing stdout:
+    print("")
+
+
+class ProgressPercentage(object):
+    def __init__(self, filename, size):
+        self._filename = filename
+        self._size = float(size)
+        self._seen_so_far = 0
+        self._lock = threading.Lock()
+
+    def __call__(self, bytes_amount):
+        # To simplify we'll assume this is hooked up
+        # to a single filename.
+        with self._lock:
+            self._seen_so_far += bytes_amount
+            percentage = (self._seen_so_far / self._size) * 100
+            sys.stdout.write(
+                "\r%s  %s / %s  (%.2f%%)"
+                % (self._filename, self._seen_so_far, self._size, percentage,)
+            )
+            sys.stdout.flush()
+
+
+# via: https://github.com/tlastowka/calculate_multipart_etag/blob/master/calculate_multipart_etag.py
+# calculate_multipart_etag  Copyright (C) 2015
+#      Tony Lastowka <tlastowka at gmail dot com>
+#      https://github.com/tlastowka
+#
+#
+# calculate_multipart_etag is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# calculate_multipart_etag is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with calculate_multipart_etag.  If not, see <http://www.gnu.org/licenses/>.
+
+
+def calculate_multipart_etag(source_path, chunk_size, expected=None):
+
+    """
+    calculates a multipart upload etag for amazon s3
+    Arguments:
+    source_path -- The file to calculate the etag for
+    chunk_size -- The chunk size to calculate for.
+    Keyword Arguments:
+    expected -- If passed a string, the string will be compared to the resulting etag
+    and raise an exception if they don't match
+    """
+
+    md5s = []
+
+    with open(source_path, "rb") as fp:
+        while True:
+
+            data = fp.read(chunk_size)
+
+            if not data:
+                break
+            md5s.append(hashlib.md5(data))
+
+    if len(md5s) > 1:
+        digests = b"".join(m.digest() for m in md5s)
+        new_md5 = hashlib.md5(digests)
+        new_etag = '"%s-%s"' % (new_md5.hexdigest(), len(md5s))
+    elif len(md5s) == 1:  # file smaller than chunk size
+        new_etag = '"%s"' % md5s[0].hexdigest()
+    else:  # empty file
+        new_etag = '""'
+
+    if expected:
+        if not expected == new_etag:
+            raise ValueError(
+                "new etag %s does not match expected %s" % (new_etag, expected)
+            )
+
+    return new_etag

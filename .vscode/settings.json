@@ -1,5 +1,6 @@
 {
     "cSpell.words": [
+        "CUST",
         "VAR's",
         "davinci",
         "dbname",
@@ -9,9 +10,11 @@
         "pgdata",
         "postgres",
         "postgresql",
+        "pytz",
         "rsync",
         "secho",
         "tfplan",
-        "xargs"
+        "xargs",
+        "xfer"
     ]
 }

@@ -13,6 +13,7 @@ from .utils import (
     _ssh_add,
     _ssh_run,
     _sq_path_join,
+    _sq_s3_xfer,
     _validate_project,
     EBS_PATH,
     EC2_USER,
@@ -23,6 +24,10 @@ from .utils import (
     S3_PROJECTS_PATH,
 )
 from .pg import mac_down, ec2_dump
+
+STRATEGY_DUCK = "duck"
+STRATEGY_SQ = "sq"
+STRATEGY = STRATEGY_SQ
 
 
 @dev.command(help="Start bash in docker container, inheriting SQ__ prefixed env vars.")
@@ -201,10 +206,16 @@ def s3_up(project):
     # WARNING: s3 sync will overwrite newer target files with older source files!
     # DON'T USE IT
     # _run_command(f"{e} aws s3 sync {local} {b}")
-    _duck("upload", project)
+    if STRATEGY == STRATEGY_DUCK:
+        _duck("upload", project)
+    else:
+        _sq_s3_xfer("upload", project)
 
 
 @dev.command(help="Download s3 to local.")
 @click.argument("project", type=click.STRING, required=True)
 def s3_down(project):
-    _duck("download", project)
+    if STRATEGY == STRATEGY_DUCK:
+        _duck("download", project)
+    else:
+        _sq_s3_xfer("download", project)
