@@ -45,6 +45,11 @@ TRANSFER_CONFIG = TransferConfig(
     use_threads=True,
 )
 
+SKIP_NONE = None
+SKIP_ETAG = "etag"
+SKIP_SIZE = "size"
+SKIP_LMOD = "lmod"
+
 
 @dataclass(frozen=True)
 class S3File:
@@ -62,19 +67,22 @@ class S3File:
     def tmp_local_path(self):
         return os.path.join("/tmp", _local_from(self.key).strip("/"))
 
-    def should_replace_local(self):
+    def skip_replace_local_reason(self, skip_on_same_size=True):
         # local does not exist, so download
         if not os.path.exists(self.local_path):
-            return True
+            return SKIP_NONE
         loc = LocalFile.from_path(self.local_path)
         # same md5 checksum, so no replace
         if self.etag == loc.etag or self.etag == loc.md5:
-            return False
+            return SKIP_ETAG
+        # skip files with same size even if checksum is different
+        if skip_on_same_size and self.size == loc.size:
+            return SKIP_SIZE
         # diff md5, so only replace if remote is newer
         if False:
             print(f"l: {loc.last_modified}")
             print(f"r: {self.last_modified}")
-        return self.last_modified > loc.last_modified
+        return SKIP_LMOD if self.last_modified > loc.last_modified else SKIP_NONE
 
 
 @dataclass(frozen=True)
@@ -111,19 +119,22 @@ class LocalFile:
             mime_type=guess_type(local_path)[0],
         )
 
-    def should_replace_remote(self, remote_ix):
+    def skip_replace_remote_reason(self, remote_ix, skip_on_same_size=True):
         r = remote_ix.get(self.key, None)
         # does not exist on remote
         if r is None:
-            return True
+            return SKIP_NONE
         # same md5 checksum, so no replace
         if self.etag == r.etag or self.md5 == r.etag:
-            return False
+            return SKIP_ETAG
+        # skip files with same size even if checksum is different
+        if skip_on_same_size and self.size == r.size:
+            return SKIP_SIZE
         # diff md5, so only replace if local is newer
         if False:
             print(f"l: {self.last_modified}")
             print(f"r: {r.last_modified}")
-        return self.last_modified > r.last_modified
+        return SKIP_LMOD if self.last_modified > r.last_modified else SKIP_NONE
 
 
 def _sq_root_path():
@@ -350,7 +361,14 @@ def _remote_ix(client, bucket, project):
     return remote_ix
 
 
-def _sq_s3_xfer(cmd, project):
+def _just(op, skip_reason=None):
+    s = op
+    if skip_reason not in [SKIP_NONE, None]:
+        s = f"{op}:{skip_reason}"
+    return f"{s}:".ljust(10)
+
+
+def _sq_s3_xfer(cmd, project, skip_on_same_size=True):
     _validate_project(project)
     client = _aws_client("s3")
     remote_ix = _remote_ix(client, S3_BUCKET, project)
@@ -364,21 +382,27 @@ def _sq_s3_xfer(cmd, project):
                 if re.search(r"\.DS_Store$", file):
                     continue
                 loc = LocalFile.from_path(os.path.join(subdir, file))
-                should_replace = loc.should_replace_remote(remote_ix)
-                if should_replace:
-                    print(f"UP  : {loc.local_path}")
+                skip_reason = loc.skip_replace_remote_reason(
+                    remote_ix, skip_on_same_size
+                )
+                if skip_reason == SKIP_NONE:
+                    s = _just("UPLOAD")
+                    print(f"{s} {loc.local_path}")
                     _upload(client, loc)
                 else:
-                    print(f"skip: {loc.local_path}")
+                    s = _just("skip", skip_reason)
+                    print(f"{s} {loc.local_path}")
 
     elif cmd == "download":
         for key, s3_file in remote_ix.items():
-            should_replace = s3_file.should_replace_local()
-            if should_replace:
-                print(f"DOWN: {s3_file.key}")
+            skip_reason = s3_file.skip_replace_local_reason(skip_on_same_size)
+            if skip_reason == SKIP_NONE:
+                s = _just("DOWNLOAD")
+                print(f"{s} {s3_file.key}")
                 _download(client, s3_file)
             else:
-                print(f"skip: {s3_file.key}")
+                s = _just("skip", skip_reason)
+                print(f"{s} {s3_file.key}")
     else:
         raise Exception(f"{cmd} NOT_IMPLEMENTED")
 

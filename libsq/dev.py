@@ -192,7 +192,13 @@ def project_init(ctx, project):
 
 @dev.command(help="Push local up to s3.")
 @click.argument("project", type=click.STRING, required=True)
-def s3_up(project):
+@click.option(
+    "--no-skip-on-same-size",
+    is_flag=True,
+    help="""Do NOT skip xfer when files have same size.
+(Normally, we skip files with same size BUT different checksum.)""",
+)
+def s3_up(project, no_skip_on_same_size=False):
     # local = _s3_local_project_path(project)
     # e = _aws_env_string()
     # b = _s3_bucket_project_url(project)
@@ -209,13 +215,19 @@ def s3_up(project):
     if STRATEGY == STRATEGY_DUCK:
         _duck("upload", project)
     else:
-        _sq_s3_xfer("upload", project)
+        _sq_s3_xfer("upload", project, not no_skip_on_same_size)
 
 
 @dev.command(help="Download s3 to local.")
 @click.argument("project", type=click.STRING, required=True)
-def s3_down(project):
+@click.option(
+    "--no-skip-on-same-size",
+    is_flag=True,
+    help="""Do NOT skip xfer when files have same size.
+(Normally, we skip files with same size BUT different checksum.)""",
+)
+def s3_down(project, no_skip_on_same_size=False):
     if STRATEGY == STRATEGY_DUCK:
         _duck("download", project)
     else:
-        _sq_s3_xfer("download", project)
+        _sq_s3_xfer("download", project, not no_skip_on_same_size)
