@@ -349,7 +349,7 @@ def _remote_ix(client, bucket, project):
     paginator = client.get_paginator("list_objects_v2")
     page_iterator = paginator.paginate(Bucket=bucket, Prefix=project_prefix)
     for page in page_iterator:
-        for o in page["Contents"]:
+        for o in page.get("Contents", []):
             s3f = S3File(
                 key=o["Key"],
                 last_modified=o["LastModified"],
