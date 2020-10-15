@@ -78,6 +78,7 @@ def restore_ec2(dbname, dumpfile):
 @pg.command(help="Stop the Mac DaVinci db (to free port 5432).")
 def mac_down():
     _ensure_host()
+    click.secho("WARNING: killing Mac Postgres process", fg="red")
     cmd = "sudo -u postgres" f" {HOST_MAC_PG_CTL}" " stop" f" -D {HOST_MAC_DATA}"
     _run_command(cmd)
 

@@ -79,7 +79,7 @@ def mk_opt_ebs():
 
 @dev.command(help="Tunnel to the aws docker pg db.")
 @click.argument("host", type=click.STRING, required=False)
-@click.option("--local-port", type=click.STRING, required=False, default="54320")
+@click.option("--local-port", type=click.STRING, required=False, default="5432")
 @click.option(
     "--print-only", is_flag=True, help="Print cmd (for sending to someone else)."
 )
