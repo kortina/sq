@@ -12,6 +12,7 @@
         "postgres",
         "postgresql",
         "pytz",
+        "regx",
         "rsync",
         "secho",
         "tfplan",

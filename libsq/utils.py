@@ -49,6 +49,7 @@ SKIP_NONE = None
 SKIP_ETAG = "etag"
 SKIP_SIZE = "size"
 SKIP_LMOD = "lmod"
+SKIP_REGX = "regx"
 
 
 def _md5(filepath, blocksize=2 ** 20):
@@ -379,34 +380,44 @@ def _just(op, skip_reason=None):
     return f"{s}:".ljust(10)
 
 
-def _sq_s3_xfer(cmd, project, skip_on_same_size=True):
+def _sq_s3_xfer(cmd, project, skip_on_same_size=True, skip_regx=None):
     _validate_project(project)
     client = _aws_client("s3")
     remote_ix = _remote_ix(client, S3_BUCKET, project)
     local_project_path = _s3_local_project_path(project)
+    skip_rx = None
+    if skip_regx is not None:
+        skip_rx = re.compile(skip_regx, re.I)
 
     if cmd == "upload":
         for subdir, dirs, files in os.walk(local_project_path):
             for file in files:
+                local_path = os.path.join(subdir, file)
 
                 # skip DS_STORE files
                 if re.search(r"\.DS_Store$", file):
                     continue
-                loc = LocalFile.from_path(os.path.join(subdir, file))
-                skip_reason = loc.skip_replace_remote_reason(
-                    remote_ix, skip_on_same_size
-                )
+                if skip_rx and skip_rx.search(file):
+                    skip_reason = SKIP_REGX
+                else:
+                    loc = LocalFile.from_path(local_path)
+                    skip_reason = loc.skip_replace_remote_reason(
+                        remote_ix, skip_on_same_size
+                    )
                 if skip_reason == SKIP_NONE:
                     s = _just("UPLOAD")
-                    print(f"{s} {loc.local_path}")
+                    print(f"{s} {local_path}")
                     _upload(client, loc)
                 else:
                     s = _just("skip", skip_reason)
-                    print(f"{s} {loc.local_path}")
+                    print(f"{s} {local_path}")
 
     elif cmd == "download":
         for key, s3_file in remote_ix.items():
-            skip_reason = s3_file.skip_replace_local_reason(skip_on_same_size)
+            if skip_rx and skip_rx.search(s3_file.key):
+                skip_reason = SKIP_REGX
+            else:
+                skip_reason = s3_file.skip_replace_local_reason(skip_on_same_size)
             if skip_reason == SKIP_NONE:
                 s = _just("DOWNLOAD")
                 print(f"{s} {s3_file.key}")
@@ -438,8 +449,13 @@ def _local_from(remote: str):
 
 
 def _download(client, s3_file):
+    # ensure tmp dir path exists
     tmp_dir = os.path.dirname(s3_file.tmp_local_path)
     os.makedirs(tmp_dir, exist_ok=True)
+
+    # ensure target dir path exists
+    target_dir = os.path.dirname(s3_file.local_path)
+    os.makedirs(target_dir, exist_ok=True)
 
     size = (
         client.head_object(Bucket=S3_BUCKET, Key=s3_file.key).get("ContentLength", None)

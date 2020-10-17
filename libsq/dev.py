@@ -198,7 +198,10 @@ def project_init(ctx, project):
     help="""Do NOT skip xfer when files have same size.
 (Normally, we skip files with same size BUT different checksum.)""",
 )
-def s3_up(project, no_skip_on_same_size=False):
+@click.option(
+    "--skip-regx", type=str, help="""SKIP files matching a pattern, eg, "\.braw$".""",
+)
+def s3_up(project, no_skip_on_same_size=False, skip_regx=None):
     # local = _s3_local_project_path(project)
     # e = _aws_env_string()
     # b = _s3_bucket_project_url(project)
@@ -215,7 +218,7 @@ def s3_up(project, no_skip_on_same_size=False):
     if STRATEGY == STRATEGY_DUCK:
         _duck("upload", project)
     else:
-        _sq_s3_xfer("upload", project, not no_skip_on_same_size)
+        _sq_s3_xfer("upload", project, not no_skip_on_same_size, skip_regx)
 
 
 @dev.command(help="Download s3 to local.")
@@ -226,8 +229,11 @@ def s3_up(project, no_skip_on_same_size=False):
     help="""Do NOT skip xfer when files have same size.
 (Normally, we skip files with same size BUT different checksum.)""",
 )
-def s3_down(project, no_skip_on_same_size=False):
+@click.option(
+    "--skip-regx", type=str, help="""SKIP files matching a pattern, eg, "\.braw$".""",
+)
+def s3_down(project, no_skip_on_same_size=False, skip_regx=None):
     if STRATEGY == STRATEGY_DUCK:
         _duck("download", project)
     else:
-        _sq_s3_xfer("download", project, not no_skip_on_same_size)
+        _sq_s3_xfer("download", project, not no_skip_on_same_size, skip_regx)
