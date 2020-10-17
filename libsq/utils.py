@@ -51,6 +51,17 @@ SKIP_SIZE = "size"
 SKIP_LMOD = "lmod"
 
 
+def _md5(filepath, blocksize=2 ** 20):
+    m = hashlib.md5()
+    with open(filepath, "rb") as f:
+        while True:
+            buf = f.read(blocksize)
+            if not buf:
+                break
+            m.update(buf)
+    return m.hexdigest().strip('"')
+
+
 @dataclass(frozen=True)
 class S3File:
     key: str
@@ -114,7 +125,7 @@ class LocalFile:
             local_path=local_path,
             last_modified=d_tz,
             etag=calculate_multipart_etag(local_path, MULTIPART_CHUNKSIZE).strip('"'),
-            md5=hashlib.md5(open(local_path, "rb").read()).hexdigest().strip('"'),
+            md5=_md5(local_path),
             size=int(os.path.getsize(local_path)),
             mime_type=guess_type(local_path)[0],
         )
