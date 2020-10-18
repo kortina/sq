@@ -183,6 +183,15 @@ def project_init(ctx, project):
     project_path = _s3_local_project_path(project)
     p = project_path
     _run_command(f"test -e {p} || mkdir {p}")
+
+    # create a cache directory
+    p = "/opt/davinci/cache"
+    _run_command(f"test -e {p} || mkdir {p}")
+
+    # create a capture directory
+    p = "/opt/davinci/capture"
+    _run_command(f"test -e {p} || mkdir {p}")
+
     for d in PROJECT_DIRS:
         p = f"{project_path}/{d}"
         _run_command(f"test -e {p} || mkdir {p}")
