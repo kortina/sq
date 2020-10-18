@@ -174,15 +174,11 @@ def _scp(local_file_path, remote_path):
 def project_init(ctx, project):
     _validate_project(project)
     u = getpass.getuser()
-    s3_path = S3_PATH
-    _run_command(
-        f"test -e {s3_path} || ( sudo mkdir {s3_path} && sudo chown -R {u}:staff {s3_path} )"
-    )
-    p = S3_PROJECTS_PATH
-    _run_command(f"test -e {p} || mkdir {p}")
-    project_path = _s3_local_project_path(project)
-    p = project_path
-    _run_command(f"test -e {p} || mkdir {p}")
+    #####################
+    # create davinci dirs
+    #####################
+    p = "/opt/davinci"
+    _run_command(f"test -e {p} || ( sudo mkdir {p} && sudo chown -R {u}:staff {p} )")
 
     # create a cache directory
     p = "/opt/davinci/cache"
@@ -190,6 +186,18 @@ def project_init(ctx, project):
 
     # create a capture directory
     p = "/opt/davinci/capture"
+    _run_command(f"test -e {p} || mkdir {p}")
+
+    #####################
+    # create project dirs
+    #####################
+    p = S3_PATH
+    _run_command(f"test -e {p} || ( sudo mkdir {p} && sudo chown -R {u}:staff {p} )")
+
+    p = S3_PROJECTS_PATH
+    _run_command(f"test -e {p} || mkdir {p}")
+    project_path = _s3_local_project_path(project)
+    p = project_path
     _run_command(f"test -e {p} || mkdir {p}")
 
     for d in PROJECT_DIRS:
