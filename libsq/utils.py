@@ -34,6 +34,7 @@ PROJECT_DIRS = [
     "live-audio",
     "live-video",
     "music",
+    "stills",
 ]
 
 MULTIPART_THRESHOLD = 1024 * 1024 * 100  # 100mb
