@@ -10,6 +10,7 @@ from .utils import (
     _run_command,
     _running_ec2_docker_public_hostname,
     _s3_local_project_path,
+    _s3_local_projects,
     _ssh_add,
     _ssh_run,
     _sq_path_join,
@@ -20,6 +21,7 @@ from .utils import (
     PGDATA_PATH,
     PG_LOG_PATH,
     PROJECT_DIRS,
+    PROJECT_CHOICES,
     S3_PATH,
     S3_PROJECTS_PATH,
 )
@@ -168,6 +170,13 @@ def _scp(local_file_path, remote_path):
     _run_command(cmd, capture_output=False)
 
 
+@dev.command(help="List projects on mac host in /opt/s3/projects")
+@click.pass_context
+def project_list(ctx):
+    for p in _s3_local_projects():
+        print(p)
+
+
 @dev.command(help="Init project directory on mac host in /opt/s3/projects")
 @click.argument("project", type=click.STRING, required=True)
 @click.pass_context
@@ -208,7 +217,7 @@ def project_init(ctx, project):
 
 
 @dev.command(help="Push local up to s3.")
-@click.argument("project", type=click.STRING, required=True)
+@click.argument("project", type=PROJECT_CHOICES, required=True)
 @click.option(
     "--no-skip-on-same-size",
     is_flag=True,
@@ -239,7 +248,7 @@ def s3_up(project, no_skip_on_same_size=False, skip_regx=None):
 
 
 @dev.command(help="Download s3 to local.")
-@click.argument("project", type=click.STRING, required=True)
+@click.argument("project", type=PROJECT_CHOICES, required=True)
 @click.option(
     "--no-skip-on-same-size",
     is_flag=True,

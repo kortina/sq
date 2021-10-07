@@ -2,6 +2,7 @@ import boto3
 from boto3.s3.transfer import TransferConfig
 import click
 from dataclasses import dataclass
+
 import datetime
 import hashlib
 from mimetypes import guess_type
@@ -322,6 +323,21 @@ def _s3_local_project_path(project):
     return f"{S3_PROJECTS_PATH}/{project}"
 
 
+def _s3_local_projects():
+    if not os.path.exists(S3_PROJECTS_PATH):
+        return []
+    projects = []
+    for p in os.listdir(S3_PROJECTS_PATH):
+        ap = os.path.abspath(os.path.join(S3_PROJECTS_PATH, p))
+        if os.path.isdir(ap):
+            projects.append(p)
+    projects.sort()
+    return projects
+
+
+PROJECT_CHOICES = click.Choice(_s3_local_projects())
+
+
 def _s3_bucket_project_url(project):
     return f"s3://{S3_BUCKET}/projects/{project}"
 
@@ -392,7 +408,7 @@ def _sq_s3_xfer(cmd, project, skip_on_same_size=True, skip_regx=None):
         skip_rx = re.compile(skip_regx, re.I)
 
     if cmd == "upload":
-        for subdir, dirs, files in os.walk(local_project_path):
+        for subdir, dirs, files in os.walk(local_project_path, followlinks=True):
             for file in files:
                 local_path = os.path.join(subdir, file)
 
