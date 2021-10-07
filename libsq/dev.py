@@ -225,7 +225,7 @@ def project_init(ctx, project):
 (Normally, we skip files with same size BUT different checksum.)""",
 )
 @click.option(
-    "--skip-regx", type=str, help="""SKIP files matching a pattern, eg, "\.braw$".""",
+    "--skip-regx", type=str, help="""SKIP files matching a pattern, eg, "\\.braw$".""",
 )
 def s3_up(project, no_skip_on_same_size=False, skip_regx=None):
     # local = _s3_local_project_path(project)
@@ -256,7 +256,7 @@ def s3_up(project, no_skip_on_same_size=False, skip_regx=None):
 (Normally, we skip files with same size BUT different checksum.)""",
 )
 @click.option(
-    "--skip-regx", type=str, help="""SKIP files matching a pattern, eg, "\.braw$".""",
+    "--skip-regx", type=str, help="""SKIP files matching a pattern, eg, "\\.braw$".""",
 )
 def s3_down(project, no_skip_on_same_size=False, skip_regx=None):
     if STRATEGY == STRATEGY_DUCK:

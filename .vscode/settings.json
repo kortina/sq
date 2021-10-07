@@ -1,22 +1,25 @@
 {
-    "cSpell.words": [
-        "CUST",
-        "VAR's",
-        "davinci",
-        "dbname",
-        "dockerenv",
-        "entrypoint",
-        "libsq",
-        "lmod",
-        "pgdata",
-        "postgres",
-        "postgresql",
-        "pytz",
-        "regx",
-        "rsync",
-        "secho",
-        "tfplan",
-        "xargs",
-        "xfer"
-    ]
+  "cSpell.words": [
+    "CUST",
+    "davinci",
+    "dbname",
+    "dockerenv",
+    "entrypoint",
+    "gmail",
+    "Lastowka",
+    "libsq",
+    "lmod",
+    "pgdata",
+    "postgres",
+    "postgresql",
+    "pytz",
+    "regx",
+    "rsync",
+    "secho",
+    "tfplan",
+    "tlastowka",
+    "VAR's",
+    "xargs",
+    "xfer"
+  ]
 }
