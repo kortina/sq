@@ -79,6 +79,18 @@ def mk_opt_ebs():
     _run_command(f'sudo chown -R "`id -u -n`":staff {p}')
 
 
+def _mk_opt_davinci():
+    p = "/opt/davinci"
+    _run_command(f"test -e {p}/capture || sudo mkdir -p {p}/capture")
+    _run_command(f"test -e {p}/proxy || sudo mkdir -p {p}/proxy")
+    _run_command(f'sudo chown -R "`id -u -n`":staff {p}')
+
+
+@dev.command(help="Create mac host /opt/davinci cache dirs")
+def mk_opt_davinci():
+    _mk_opt_davinci()
+
+
 @dev.command(help="Tunnel to the aws docker pg db.")
 @click.argument("host", type=click.STRING, required=False)
 @click.option("--local-port", type=click.STRING, required=False, default="5432")
@@ -225,7 +237,9 @@ def project_init(ctx, project):
 (Normally, we skip files with same size BUT different checksum.)""",
 )
 @click.option(
-    "--skip-regx", type=str, help="""SKIP files matching a pattern, eg, "\\.braw$".""",
+    "--skip-regx",
+    type=str,
+    help="""SKIP files matching a pattern, eg, "\\.braw$".""",
 )
 def s3_up(project, no_skip_on_same_size=False, skip_regx=None):
     # local = _s3_local_project_path(project)
@@ -256,7 +270,9 @@ def s3_up(project, no_skip_on_same_size=False, skip_regx=None):
 (Normally, we skip files with same size BUT different checksum.)""",
 )
 @click.option(
-    "--skip-regx", type=str, help="""SKIP files matching a pattern, eg, "\\.braw$".""",
+    "--skip-regx",
+    type=str,
+    help="""SKIP files matching a pattern, eg, "\\.braw$".""",
 )
 def s3_down(project, no_skip_on_same_size=False, skip_regx=None):
     if STRATEGY == STRATEGY_DUCK:

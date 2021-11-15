@@ -1,5 +1,6 @@
 import click
 import datetime
+import re
 from . import docker, pg, HOST_MAC_IP
 from .utils import (
     _docker_exec,
@@ -75,12 +76,42 @@ def restore_ec2(dbname, dumpfile):
     # _docker_exec(f"./sq docker pg-restore {dbname} {dumpfile}", True)
 
 
+def _mac_is_running():
+    # lsof should show ssh bound to 5432 on local, not postgres
+    port = "5432"  # postgres port
+    cmd = "lsof -i :{}".format(port)
+    o = _run_command(cmd, capture_output=True)
+    rgx = re.compile(r"^ControlCe")
+    if o:
+        for line in o.split("\n"):
+            print(line)
+            if rgx.search(line):
+                return True
+    return False
+
+
 @pg.command(help="Stop the Mac DaVinci db (to free port 5432).")
 def mac_down():
     _ensure_host()
+
+    # kill the DaVinci pg server:
     click.secho("WARNING: killing Mac Postgres process", fg="red")
-    cmd = "sudo -u postgres" f" {HOST_MAC_PG_CTL}" " stop" f" -D {HOST_MAC_DATA}"
+    cmd = (
+        f"test -e {HOST_MAC_PG_CTL} "
+        f" &&  sudo -u postgres {HOST_MAC_PG_CTL} stop"
+        f" -D {HOST_MAC_DATA}"
+    )
     _run_command(cmd)
+
+    # kill homebrew pg server:
+    # rob is pinned to @12
+    cmd = "brew services | grep -q postgresql && brew services stop postgresql@12"
+    _run_command(cmd)
+
+    if _mac_is_running():
+        raise Exception(
+            "ERROR: Tried to kill mac pg, but process run by postgres user is still bound to localhost 5432."
+        )
 
 
 @pg.command(help="Start the Mac DaVinci db.")

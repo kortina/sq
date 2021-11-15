@@ -181,7 +181,9 @@ def _aws_kwargs():
 def _aws_env_string():
     k = _aws_kwargs()
     return "AWS_ACCESS_KEY_ID='{}' AWS_SECRET_ACCESS_KEY='{}' AWS_DEFAULT_REGION='{}'".format(
-        k["aws_access_key_id"], k["aws_secret_access_key"], k["region_name"],
+        k["aws_access_key_id"],
+        k["aws_secret_access_key"],
+        k["region_name"],
     )
 
 
@@ -269,7 +271,10 @@ def _run_command(
             p = subprocess.CompletedProcess(cmd, e.returncode, stderr=e.output)
         # return this as a string you can actually work with:
         if capture_output and decode_output:
-            return p.stdout.decode("utf-8").strip()
+            stdout = p.stdout
+            if not stdout:
+                return stdout
+            return stdout.decode("utf-8").strip()
         else:
             return p
 
@@ -526,7 +531,12 @@ class ProgressPercentage(object):
             percentage = (self._seen_so_far / self._size) * 100
             sys.stdout.write(
                 "\r%s  %s / %s  (%.2f%%)"
-                % (self._filename, self._seen_so_far, self._size, percentage,)
+                % (
+                    self._filename,
+                    self._seen_so_far,
+                    self._size,
+                    percentage,
+                )
             )
             sys.stdout.flush()
 
