@@ -81,7 +81,7 @@ def _mac_is_running():
     port = "5432"  # postgres port
     cmd = "lsof -i :{}".format(port)
     o = _run_command(cmd, capture_output=True)
-    rgx = re.compile(r"^ControlCe")
+    rgx = re.compile(r"^postgres")
     if o:
         for line in o.split("\n"):
             print(line)
