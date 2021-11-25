@@ -45,7 +45,8 @@ def tail_davinci(lines):
     cmd = "tail -f"
     if lines:
         cmd = f"{cmd} -n {lines} "
-    cmd = f'{cmd} "/Library/Application Support/Blackmagic Design/DaVinci Resolve/logs/davinci_resolve.log" '
+    lp = "$HOME/Library/Application Support/Blackmagic Design/DaVinci Resolve/logs/davinci_resolve.log"
+    cmd = f'{cmd} "{lp}" '
     _run_command(cmd)
 
 
