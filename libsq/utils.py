@@ -53,6 +53,7 @@ SKIP_ETAG = "etag"
 SKIP_SIZE = "size"
 SKIP_LMOD = "lmod"
 SKIP_REGX = "regx"
+SKIP_ISDR = "isdr"
 
 
 def _md5(filepath, blocksize=2 ** 20):
@@ -86,6 +87,8 @@ class S3File:
         # local does not exist, so download
         if not os.path.exists(self.local_path):
             return SKIP_NONE
+        if os.path.isdir(self.local_path):
+            return SKIP_ISDR
         loc = LocalFile.from_path(self.local_path)
         # same md5 checksum, so no replace
         if self.etag == loc.etag or self.etag == loc.md5:
