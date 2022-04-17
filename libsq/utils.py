@@ -54,6 +54,7 @@ SKIP_SIZE = "size"
 SKIP_LMOD = "lmod"
 SKIP_REGX = "regx"
 SKIP_ISDR = "isdr"
+SKIP_MRGX = "mrgx"
 
 
 def _md5(filepath, blocksize=2 ** 20):
@@ -406,7 +407,7 @@ def _just(op, skip_reason=None):
     return f"{s}:".ljust(10)
 
 
-def _sq_s3_xfer(cmd, project, skip_on_same_size=True, skip_regx=None):
+def _sq_s3_xfer(cmd, project, skip_on_same_size=True, skip_regx=None, match_regx=None):
     _validate_project(project)
     client = _aws_client("s3")
     remote_ix = _remote_ix(client, S3_BUCKET, project)
@@ -414,6 +415,10 @@ def _sq_s3_xfer(cmd, project, skip_on_same_size=True, skip_regx=None):
     skip_rx = None
     if skip_regx is not None:
         skip_rx = re.compile(skip_regx, re.I)
+
+    match_rx = None
+    if match_regx is not None:
+        match_rx = re.compile(match_regx, re.I)
 
     if cmd == "upload":
         for subdir, dirs, files in os.walk(local_project_path, followlinks=True):
@@ -425,6 +430,8 @@ def _sq_s3_xfer(cmd, project, skip_on_same_size=True, skip_regx=None):
                     continue
                 if skip_rx and skip_rx.search(file):
                     skip_reason = SKIP_REGX
+                elif match_rx and not match_rx.search(file):
+                    skip_reason = SKIP_MRGX
                 else:
                     loc = LocalFile.from_path(local_path)
                     skip_reason = loc.skip_replace_remote_reason(
