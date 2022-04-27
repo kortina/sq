@@ -449,6 +449,8 @@ def _sq_s3_xfer(cmd, project, skip_on_same_size=True, skip_regx=None, match_regx
         for key, s3_file in remote_ix.items():
             if skip_rx and skip_rx.search(s3_file.key):
                 skip_reason = SKIP_REGX
+            elif match_rx and not match_rx.search(s3_file.key):
+                skip_reason = SKIP_MRGX
             else:
                 skip_reason = s3_file.skip_replace_local_reason(skip_on_same_size)
             if skip_reason == SKIP_NONE:
