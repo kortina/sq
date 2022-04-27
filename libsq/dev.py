@@ -280,8 +280,15 @@ def s3_up(project, no_skip_on_same_size=False, skip_regx=None, match_regx=None):
     type=str,
     help="""SKIP files matching a pattern, eg, "\\.braw$".""",
 )
-def s3_down(project, no_skip_on_same_size=False, skip_regx=None):
+@click.option(
+    "--match-regx",
+    type=str,
+    help="""SKIP files NOT-matching a pattern, eg, "\\.braw$".""",
+)
+def s3_down(project, no_skip_on_same_size=False, skip_regx=None, match_regx=None):
     if STRATEGY == STRATEGY_DUCK:
         _duck("download", project)
     else:
-        _sq_s3_xfer("download", project, not no_skip_on_same_size, skip_regx)
+        _sq_s3_xfer(
+            "download", project, not no_skip_on_same_size, skip_regx, match_regx
+        )
