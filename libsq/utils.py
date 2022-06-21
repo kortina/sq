@@ -37,12 +37,21 @@ PROJECT_DIRS = [
 
 MULTIPART_THRESHOLD = 1024 * 1024 * 100  # 100mb
 MULTIPART_CHUNKSIZE = 1024 * 1024 * 100  # 100mb
-TRANSFER_CONFIG = TransferConfig(
-    multipart_threshold=MULTIPART_THRESHOLD,
-    max_concurrency=10,
-    multipart_chunksize=MULTIPART_CHUNKSIZE,
-    use_threads=True,
-)
+
+
+def _transfer_config(max_bandwidth_mb=None):
+    max_bandwidth = None
+    if max_bandwidth_mb:
+        print(f"WARNING: max_bandwidth set to: {max_bandwidth_mb}MBps")
+        max_bandwidth = 1_000_000 * max_bandwidth_mb
+    return TransferConfig(
+        multipart_threshold=MULTIPART_THRESHOLD,
+        max_concurrency=10,
+        multipart_chunksize=MULTIPART_CHUNKSIZE,
+        use_threads=True,
+        max_bandwidth=max_bandwidth,
+    )
+
 
 SKIP_NONE = None
 SKIP_ETAG = "etag"
@@ -403,7 +412,14 @@ def _just(op, skip_reason=None):
     return f"{s}:".ljust(10)
 
 
-def _sq_s3_xfer(cmd, project, skip_on_same_size=True, skip_regx=None, match_regx=None):
+def _sq_s3_xfer(
+    cmd,
+    project,
+    skip_on_same_size=True,
+    skip_regx=None,
+    match_regx=None,
+    max_bandwidth_mb=None,
+):
     _validate_project(project)
     client = _aws_client("s3")
     remote_ix = _remote_ix(client, S3_BUCKET, project)
@@ -436,7 +452,7 @@ def _sq_s3_xfer(cmd, project, skip_on_same_size=True, skip_regx=None, match_regx
                 if skip_reason == SKIP_NONE:
                     s = _just("UPLOAD")
                     print(f"{s} {local_path}")
-                    _upload(client, loc)
+                    _upload(client, loc, max_bandwidth_mb)
                 else:
                     s = _just("skip", skip_reason)
                     print(f"{s} {local_path}")
@@ -452,7 +468,7 @@ def _sq_s3_xfer(cmd, project, skip_on_same_size=True, skip_regx=None, match_regx
             if skip_reason == SKIP_NONE:
                 s = _just("DOWNLOAD")
                 print(f"{s} {s3_file.key}")
-                _download(client, s3_file)
+                _download(client, s3_file, max_bandwidth_mb)
             else:
                 s = _just("skip", skip_reason)
                 print(f"{s} {s3_file.key}")
@@ -479,7 +495,7 @@ def _local_from(remote: str):
     return f"{S3_PATH}/{remote}"
 
 
-def _download(client, s3_file):
+def _download(client, s3_file, max_bandwidth_mb=None):
     # ensure tmp dir path exists
     tmp_dir = os.path.dirname(s3_file.tmp_local_path)
     os.makedirs(tmp_dir, exist_ok=True)
@@ -497,7 +513,7 @@ def _download(client, s3_file):
         S3_BUCKET,
         s3_file.key,
         s3_file.tmp_local_path,
-        Config=TRANSFER_CONFIG,
+        Config=_transfer_config(max_bandwidth_mb),
         Callback=ProgressPercentage(s3_file.key, size),
     )
     # add a newline since we have been flushing stdout:
@@ -505,7 +521,7 @@ def _download(client, s3_file):
     shutil.move(s3_file.tmp_local_path, s3_file.local_path)
 
 
-def _upload(client, local_file):
+def _upload(client, local_file, max_bandwidth_mb=None):
     x = {}
     # x["MetaData"] = {"Content-MD5": local_file.etag}
     if local_file.mime_type:
@@ -516,7 +532,7 @@ def _upload(client, local_file):
         local_file.local_path,
         S3_BUCKET,
         local_file.key,
-        Config=TRANSFER_CONFIG,
+        Config=_transfer_config(max_bandwidth_mb),
         Callback=ProgressPercentage(local_file.local_path, local_file.size),
         ExtraArgs=x,
     )

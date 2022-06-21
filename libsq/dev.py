@@ -247,7 +247,18 @@ def project_init(ctx, project):
     type=str,
     help="""SKIP files NOT-matching a pattern, eg, "\\.braw$".""",
 )
-def s3_up(project, no_skip_on_same_size=False, skip_regx=None, match_regx=None):
+@click.option(
+    "--max-bandwidth-mb",
+    type=int,
+    help="""Maximum bandwidth MBps.""",
+)
+def s3_up(
+    project,
+    no_skip_on_same_size=False,
+    skip_regx=None,
+    match_regx=None,
+    max_bandwidth_mb=None,
+):
     # local = _s3_local_project_path(project)
     # e = _aws_env_string()
     # b = _s3_bucket_project_url(project)
@@ -264,7 +275,14 @@ def s3_up(project, no_skip_on_same_size=False, skip_regx=None, match_regx=None):
     if STRATEGY == STRATEGY_DUCK:
         _duck("upload", project)
     else:
-        _sq_s3_xfer("upload", project, not no_skip_on_same_size, skip_regx, match_regx)
+        _sq_s3_xfer(
+            "upload",
+            project,
+            not no_skip_on_same_size,
+            skip_regx,
+            match_regx,
+            max_bandwidth_mb,
+        )
 
 
 @dev.command(help="Download s3 to local.")
@@ -285,10 +303,26 @@ def s3_up(project, no_skip_on_same_size=False, skip_regx=None, match_regx=None):
     type=str,
     help="""SKIP files NOT-matching a pattern, eg, "\\.braw$".""",
 )
-def s3_down(project, no_skip_on_same_size=False, skip_regx=None, match_regx=None):
+@click.option(
+    "--max-bandwidth-mb",
+    type=int,
+    help="""Maximum bandwidth MBps.""",
+)
+def s3_down(
+    project,
+    no_skip_on_same_size=False,
+    skip_regx=None,
+    match_regx=None,
+    max_bandwidth_mb=None,
+):
     if STRATEGY == STRATEGY_DUCK:
         _duck("download", project)
     else:
         _sq_s3_xfer(
-            "download", project, not no_skip_on_same_size, skip_regx, match_regx
+            "download",
+            project,
+            not no_skip_on_same_size,
+            skip_regx,
+            match_regx,
+            max_bandwidth_mb,
         )
