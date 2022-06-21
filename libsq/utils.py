@@ -27,16 +27,12 @@ PGDATA_PATH = f"{EBS_PATH}/pgdata"
 PG_LOG_PATH = f"{EBS_PATH}/pg_log"
 S3_BUCKET = "sq-us-west-1"
 PROJECT_DIRS = [
-    "clips-audio",
-    "clips-video",  # for youtube-dl etc.
+    "dailies",
     "exports",
-    "films",  # for films referenced
     "gallery",  # for DaVinci
-    "live-audio",
-    "live-video",
-    "music",
-    "stills",
-    "table-reads",
+    "other-audio",  # music, table reads
+    "other-stills",  # still photos and graphics
+    "other-video",  # film and youtube clips, table reads
 ]
 
 MULTIPART_THRESHOLD = 1024 * 1024 * 100  # 100mb
