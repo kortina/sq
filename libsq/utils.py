@@ -5,6 +5,7 @@ from dataclasses import dataclass
 
 import datetime
 import hashlib
+import json
 from mimetypes import guess_type
 import pathlib
 import pytz
@@ -35,13 +36,13 @@ PROJECT_DIRS = [
     "other-video",  # film and youtube clips, table reads
 ]
 
-MULTIPART_THRESHOLD = 1024 * 1024 * 100  # 100mb
-MULTIPART_CHUNKSIZE = 1024 * 1024 * 100  # 100mb
+MULTIPART_THRESHOLD = 1024 * 1024 * 200  # 100mb
+MULTIPART_CHUNKSIZE = 1024 * 1024 * 200  # 100mb
 
 
 def _transfer_config(max_bandwidth_mb=None):
     max_bandwidth = None
-    if max_bandwidth_mb:
+    if max_bandwidth_mb
         print(f"WARNING: max_bandwidth set to: {max_bandwidth_mb}MBps")
         max_bandwidth = 1_000_000 * max_bandwidth_mb
     return TransferConfig(
@@ -114,8 +115,6 @@ class LocalFile:
     key: str
     local_path: str
     last_modified: datetime.datetime
-    etag: str
-    md5: str
     size: int
     mime_type: str
 
@@ -137,11 +136,18 @@ class LocalFile:
             key=_remote_from(local_path),
             local_path=local_path,
             last_modified=d_tz,
-            etag=calculate_multipart_etag(local_path, MULTIPART_CHUNKSIZE).strip('"'),
-            md5=_md5(local_path),
             size=int(os.path.getsize(local_path)),
             mime_type=guess_type(local_path)[0],
         )
+
+    # NB: takes a LONG time for large files to compute md5
+    @property
+    def md5(self):
+        return _md5(self.local_path)
+
+    @property
+    def etag(self):
+        return calculate_multipart_etag(self.local_path, MULTIPART_CHUNKSIZE).strip('"')
 
     def skip_replace_remote_reason(self, remote_ix, skip_on_same_size=True):
         r = remote_ix.get(self.key, None)
@@ -419,6 +425,7 @@ def _sq_s3_xfer(
     skip_regx=None,
     match_regx=None,
     max_bandwidth_mb=None,
+    resume_incomplete=False,
 ):
     _validate_project(project)
     client = _aws_client("s3")
@@ -452,7 +459,7 @@ def _sq_s3_xfer(
                 if skip_reason == SKIP_NONE:
                     s = _just("UPLOAD")
                     print(f"{s} {local_path}")
-                    _upload(client, loc, max_bandwidth_mb)
+                    _upload(client, loc, resume_incomplete, max_bandwidth_mb)
                 else:
                     s = _just("skip", skip_reason)
                     print(f"{s} {local_path}")
@@ -521,12 +528,44 @@ def _download(client, s3_file, max_bandwidth_mb=None):
     shutil.move(s3_file.tmp_local_path, s3_file.local_path)
 
 
-def _upload(client, local_file, max_bandwidth_mb=None):
+def _find_orphans(client, local_file):
+    return
+    uploads = client.list_multipart_uploads(Bucket=S3_BUCKET)
+    orphans = [u for u in uploads["Uploads"] if u["Key"] == local_file.key]
+
+    upload = orphans[0]
+    upload_id = upload["UploadId"]
+    upload_key = upload["Key"]
+    resp = client.list_parts(UploadId=upload_id, Bucket=S3_BUCKET, Key=upload_key)
+    import json
+
+    print(json.dumps(resp, indent=4, sort_keys=True, default=str))
+    parts = resp["Parts"]
+    max_parts = resp["MaxParts"]
+    next_part_number = resp["NextPartNumberMarker"]
+    #         See:
+    # Part(part_number)
+    # Creates a MultipartUploadPart resource.:
+    #
+    # multipart_upload_part = multipart_upload.Part('part_number')
+    # Parameters
+    # part_number (string) -- The Part's part_number identifier. This must be set.
+    # Return type
+    # S3.MultipartUploadPart
+    # Returns
+    # A MultipartUploadPart resource
+    # TODO: **AND** https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#multipartuploadpart
+
+
+def _upload(client, local_file, resume_incomplete, max_bandwidth_mb=None):
     x = {}
     # x["MetaData"] = {"Content-MD5": local_file.etag}
     if local_file.mime_type:
         x["ContentType"] = local_file.mime_type
         # , "ETag": local_file.etag
+
+    if resume_incomplete:
+        orphans = _find_orphans(client, local_file)
 
     client.upload_file(
         local_file.local_path,
