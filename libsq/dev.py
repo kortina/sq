@@ -252,18 +252,12 @@ def project_init(ctx, project):
     type=int,
     help="""Maximum bandwidth MBps.""",
 )
-@click.option(
-    "--resume-incomplete",
-    is_flag=True,
-    help="""Resume incomplete uploads.""",
-)
 def s3_up(
     project,
     no_skip_on_same_size=False,
     skip_regx=None,
     match_regx=None,
     max_bandwidth_mb=None,
-    resume_incomplete=False,
 ):
     # local = _s3_local_project_path(project)
     # e = _aws_env_string()
@@ -288,7 +282,6 @@ def s3_up(
             skip_regx,
             match_regx,
             max_bandwidth_mb,
-            resume_incomplete=resume_incomplete,
         )
 
 

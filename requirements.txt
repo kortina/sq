@@ -1,3 +1,5 @@
 boto3
 click
+magic
 pytz
+types-pytz
