@@ -6,7 +6,8 @@ from dataclasses import dataclass
 import datetime
 import hashlib
 import json
-from mimetypes import guess_type
+import magic
+import math
 import pathlib
 import pytz
 import os
@@ -36,19 +37,24 @@ PROJECT_DIRS = [
     "other-video",  # film and youtube clips, table reads
 ]
 
-MULTIPART_THRESHOLD = 1024 * 1024 * 200  # 100mb
-MULTIPART_CHUNKSIZE = 1024 * 1024 * 200  # 100mb
+MULTIPART_THRESHOLD = 1024 * 1024 * 100  # mb
+MULTIPART_CHUNKSIZE = 1024 * 1024 * 100  # mb
+MULTIPART_MAX_PARTS = 1000
 
 
-def _transfer_config(max_bandwidth_mb=None):
+def _transfer_config(max_bandwidth_mb=None, upload_file=None):
     max_bandwidth = None
-    if max_bandwidth_mb
+    if max_bandwidth_mb:
         print(f"WARNING: max_bandwidth set to: {max_bandwidth_mb}MBps")
         max_bandwidth = 1_000_000 * max_bandwidth_mb
+    if upload_file:
+        chunksize = upload_file.chunksize
+    else:
+        chunksize = MULTIPART_CHUNKSIZE
     return TransferConfig(
         multipart_threshold=MULTIPART_THRESHOLD,
         max_concurrency=10,
-        multipart_chunksize=MULTIPART_CHUNKSIZE,
+        multipart_chunksize=chunksize,
         use_threads=True,
         max_bandwidth=max_bandwidth,
     )
@@ -61,6 +67,10 @@ SKIP_LMOD = "lmod"
 SKIP_REGX = "regx"
 SKIP_ISDR = "isdr"
 SKIP_MRGX = "mrgx"
+
+
+def _guess_type(filepath):
+    return magic.from_file(filepath, mime=True)
 
 
 def _md5(filepath, blocksize=2 ** 20):
@@ -137,13 +147,17 @@ class LocalFile:
             local_path=local_path,
             last_modified=d_tz,
             size=int(os.path.getsize(local_path)),
-            mime_type=guess_type(local_path)[0],
+            mime_type=_guess_type(local_path)[0],
         )
 
     # NB: takes a LONG time for large files to compute md5
     @property
     def md5(self):
         return _md5(self.local_path)
+
+    @property
+    def chunksize(self):
+        return math.ceil(float(self.size) / MULTIPART_MAX_PARTS)
 
     @property
     def etag(self):
@@ -393,8 +407,12 @@ def _duck(cmd, project):
     _run_command(cmd)
 
 
+def _project_prefix(project):
+    return f"projects/{project}"
+
+
 def _remote_ix(client, bucket, project):
-    project_prefix = f"projects/{project}"
+    project_prefix = _project_prefix(project)
     remote_ix = {}
     paginator = client.get_paginator("list_objects_v2")
     page_iterator = paginator.paginate(Bucket=bucket, Prefix=project_prefix)
@@ -459,7 +477,7 @@ def _sq_s3_xfer(
                 if skip_reason == SKIP_NONE:
                     s = _just("UPLOAD")
                     print(f"{s} {local_path}")
-                    _upload(client, loc, resume_incomplete, max_bandwidth_mb)
+                    _upload(client, project, loc, resume_incomplete, max_bandwidth_mb)
                 else:
                     s = _just("skip", skip_reason)
                     print(f"{s} {local_path}")
@@ -528,21 +546,44 @@ def _download(client, s3_file, max_bandwidth_mb=None):
     shutil.move(s3_file.tmp_local_path, s3_file.local_path)
 
 
-def _find_orphans(client, local_file):
-    return
-    uploads = client.list_multipart_uploads(Bucket=S3_BUCKET)
-    orphans = [u for u in uploads["Uploads"] if u["Key"] == local_file.key]
+# TODO: THIS: https://gist.github.com/teasherm/bb73f21ed2f3b46bc1c2ca48ec2c1cf5
+def _find_orphans(client, project, local_file):
+    breakpoint()
 
+    if "Uploads" not in uploads:
+        return []
+
+    # find those that match the file I was just uploading
+    orphans = [u for u in uploads["Uploads"] if u["Key"] == key]
+    # TODO:: also COMPARE md5 / etag
+
+    if len(orphans) == 0:
+        return []
+
+    # there may be multiple, but assume here there is exactly one:
     upload = orphans[0]
+
+    # get UploadId and Key so we can list parts:
     upload_id = upload["UploadId"]
     upload_key = upload["Key"]
-    resp = client.list_parts(UploadId=upload_id, Bucket=S3_BUCKET, Key=upload_key)
-    import json
-
+    resp = client.list_parts(UploadId=upload_id, Bucket=bucket, Key=upload_key)
     print(json.dumps(resp, indent=4, sort_keys=True, default=str))
-    parts = resp["Parts"]
-    max_parts = resp["MaxParts"]
-    next_part_number = resp["NextPartNumberMarker"]
+    breakpoint()
+
+    return
+    # uploads = client.list_multipart_uploads(Bucket=S3_BUCKET)
+    # orphans = [u for u in uploads["Uploads"] if u["Key"] == local_file.key]
+
+    # upload = orphans[0]
+    # upload_id = upload["UploadId"]
+    # upload_key = upload["Key"]
+    # resp = client.list_parts(UploadId=upload_id, Bucket=S3_BUCKET, Key=upload_key)
+    # import json
+
+    # print(json.dumps(resp, indent=4, sort_keys=True, default=str))
+    # parts = resp["Parts"]
+    # max_parts = resp["MaxParts"]
+    # next_part_number = resp["NextPartNumberMarker"]
     #         See:
     # Part(part_number)
     # Creates a MultipartUploadPart resource.:
@@ -557,7 +598,153 @@ def _find_orphans(client, local_file):
     # TODO: **AND** https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#multipartuploadpart
 
 
-def _upload(client, local_file, resume_incomplete, max_bandwidth_mb=None):
+class MultipartUpload:
+    def __init__(self, client, project, local_file):
+        self.client = client
+        self.project = project
+        self.local_file = local_file
+        self.parts = []
+
+    def orphan(self):
+        project_prefix = _project_prefix(self.project)
+        key = self.local_file.key
+
+        uploads = self.client.list_multipart_uploads(
+            Bucket=S3_BUCKET, Prefix=project_prefix
+        )
+        if "Uploads" not in uploads:
+            print("No 'Uploads' key.")
+            return None
+
+        # find those that match the file
+        orphans = [u for u in uploads["Uploads"] if u["Key"] == key]
+
+        # TODO:: also COMPARE md5 / etag
+        if len(orphans) == 0:
+            print("No matching orphans.")
+            return None
+
+        # TODO: elect the best orphan if there is more than one:
+        return orphans[0]
+
+    def upload_remaining(self):
+        upload = self.orphan()
+
+        uploaded_parts = []
+        # TODO: make this min size 100mb chunks / part of the local_file
+        max_parts = MULTIPART_MAX_PARTS
+
+        if upload:
+            upload_id = upload["UploadId"]
+            resp = self.list_parts(upload_id)
+            uploaded_parts = resp.get("Parts", [])
+            # max_parts = resp["MaxParts"]  # 1000
+            # next_part_number = resp["NextPartNumberMarker"]  # 44
+            # is_truncated = resp["IsTruncated"]
+
+        else:
+            upload = self.create_upload()
+            upload_id = upload["UploadId"]
+            uploaded_parts = []
+
+        uploaded_part_nums = set([p["PartNumber"] for p in uploaded_parts])
+        checksums = []
+        part_num = 0
+        bytes_uploaded = 0
+        with self._file_reader() as f:
+            # TODO: less than or less than equal to?
+            while part_num <= max_parts:
+                part_num = part_num + 1
+                chunk = f.read(self.local_file.chunksize)
+                chunksize = len(chunk)
+                bytes_uploaded = bytes_uploaded + chunksize
+
+                checksums.append(self._part_checksum(part_num, chunk))
+
+                # continue if part already uploaded
+                if part_num in uploaded_part_nums:
+                    print("part_num {} already uploaded...".format(part_num))
+                    continue
+                sys.stdout.write(
+                    "Uploading part ({} / {}) {}mb / {}mb ... {}%".format(
+                        part_num,
+                        max_parts,
+                        int(chunksize / 1024 / 1024),
+                        int(self.local_file.size / 1024 / 1024),
+                        int(100 * bytes_uploaded / self.local_file.size),
+                    )
+                )
+                sys.stdout.flush()
+
+                # upload part
+                self.client.upload_part(
+                    Body=chunk,
+                    Bucket=S3_BUCKET,
+                    Key=self.local_file.key,
+                    UploadId=upload_id,
+                    PartNumber=part_num,
+                )
+                # print(
+                #     "{0} of {1} uploaded ({2}%)".format(
+                #         bytes_uploaded,
+                #         self.local_file.size,
+                #         int(100 * bytes_uploaded / self.local_file.size),
+                #     )
+                # )
+        print("")
+        self.finalize(upload_id, checksums)
+        sys.exit()
+
+    def _file_reader(self):
+        return open(self.local_file.local_path, "rb")
+
+    def list_parts(self, upload_id):
+        resp = self.client.list_parts(
+            UploadId=upload_id, Bucket=S3_BUCKET, Key=self.local_file.key
+        )
+        if "Parts" not in resp:
+            print("No 'Parts' uploaded.")
+        return resp
+
+    def create_upload(self):
+        resp = self.client.create_multipart_upload(
+            Bucket=S3_BUCKET,
+            ContentType=self.local_file.mime_type,
+            Key=self.local_file.key,
+        )
+        upload_id = resp.get("UploadId")
+        print(f"Created multipart upload_id:{upload_id}")
+        return resp
+
+    def _part_checksum(self, part_num, chunk):
+        m = hashlib.md5()
+        m.update(chunk)
+        etag = m.hexdigest().strip('"')
+        return {"PartNumber": part_num, "ETag": etag}
+
+    # TODO: optionally pass in parts computed by uploader
+    def finalize(self, upload_id, checksums=None):
+        # recompute the parts / etags
+        if checksums is None:
+            checksums = []
+            part_num = 0
+            with self._file_reader() as f:
+                while part_num <= MULTIPART_MAX_PARTS:
+                    part_num = part_num + 1
+                    chunk = f.read(self.local_file.chunksize)
+                    checksums.append(self._part_checksum(part_num, chunk))
+
+        print(f"finalize: {self.local_file.local_path}")
+        response = self.client.complete_multipart_upload(
+            Bucket=S3_BUCKET,
+            Key=self.local_file.key,
+            UploadId=upload_id,
+            MultipartUpload={"Parts": checksums},
+        )
+        print(response)
+
+
+def _upload(client, project, local_file, resume_incomplete, max_bandwidth_mb=None):
     x = {}
     # x["MetaData"] = {"Content-MD5": local_file.etag}
     if local_file.mime_type:
@@ -565,13 +752,15 @@ def _upload(client, local_file, resume_incomplete, max_bandwidth_mb=None):
         # , "ETag": local_file.etag
 
     if resume_incomplete:
-        orphans = _find_orphans(client, local_file)
+        mu = MultipartUpload(client, project, local_file)
+        mu.upload_remaining()
+        # orphans = _find_orphans(client, project, local_file)
 
     client.upload_file(
         local_file.local_path,
         S3_BUCKET,
         local_file.key,
-        Config=_transfer_config(max_bandwidth_mb),
+        Config=_transfer_config(max_bandwidth_mb, upload_file=local_file),
         Callback=ProgressPercentage(local_file.local_path, local_file.size),
         ExtraArgs=x,
     )
