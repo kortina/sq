@@ -622,7 +622,6 @@ class MultipartUpload:
         part_num = 0
         bytes_uploaded = 0
         with self._file_reader() as f:
-            # TODO: less than or less than equal to?
             while part_num <= self.local_file.num_parts:
                 part_num = part_num + 1
                 chunk = f.read(self.local_file.chunksize)
