@@ -238,6 +238,12 @@ def project_init(ctx, project):
 (Normally, we skip files with same size BUT different checksum.)""",
 )
 @click.option(
+    "--skip-if-same-size-without-etag-check",
+    is_flag=True,
+    help="""Do NOT check etag if files have exactly same size.
+(Normally, we skip files with same size BUT different checksum.)""",
+)
+@click.option(
     "--skip-regx",
     type=str,
     help="""SKIP files matching a pattern, eg, "\\.braw$".""",
@@ -255,6 +261,7 @@ def project_init(ctx, project):
 def s3_up(
     project,
     no_skip_on_same_size=False,
+    skip_if_same_size_without_etag_check=False,
     skip_regx=None,
     match_regx=None,
     max_bandwidth_mb=None,
@@ -279,6 +286,7 @@ def s3_up(
             "upload",
             project,
             not no_skip_on_same_size,
+            skip_if_same_size_without_etag_check,
             skip_regx,
             match_regx,
             max_bandwidth_mb,
@@ -318,10 +326,12 @@ def s3_down(
     if STRATEGY == STRATEGY_DUCK:
         _duck("download", project)
     else:
+        skip_if_same_size_without_etag_check = False
         _sq_s3_xfer(
             "download",
             project,
             not no_skip_on_same_size,
+            skip_if_same_size_without_etag_check,
             skip_regx,
             match_regx,
             max_bandwidth_mb,

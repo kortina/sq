@@ -1,3 +1,4 @@
+from argparse import ArgumentError
 import boto3
 from boto3.s3.transfer import TransferConfig
 import click
@@ -181,14 +182,24 @@ class LocalFile:
     def etag(self):
         return calculate_multipart_etag(self.local_path, self.chunksize).strip('"')
 
-    def skip_replace_remote_reason(self, remote_ix, skip_on_same_size=True):
+    def skip_replace_remote_reason(
+        self,
+        remote_ix,
+        skip_on_same_size=True,
+        skip_if_same_size_without_etag_check=False,
+    ):
         r = remote_ix.get(self.key, None)
         # does not exist on remote
         if r is None:
             return SKIP_NONE
+        if skip_if_same_size_without_etag_check and not skip_on_same_size:
+            print("MUST either check size or etag.....")
+            raise ArgumentError
+
         # same md5 checksum, so no replace
-        if self.etag == r.etag or self.md5 == r.etag:
-            return SKIP_ETAG
+        if not skip_if_same_size_without_etag_check:
+            if self.etag == r.etag or self.md5 == r.etag:
+                return SKIP_ETAG
         # skip files with same size even if checksum is different
         if skip_on_same_size and self.size == r.size:
             return SKIP_SIZE
@@ -458,6 +469,7 @@ def _sq_s3_xfer(
     cmd,
     project,
     skip_on_same_size=True,
+    skip_if_same_size_without_etag_check=False,
     skip_regx=None,
     match_regx=None,
     max_bandwidth_mb=None,
@@ -489,7 +501,9 @@ def _sq_s3_xfer(
                 else:
                     loc = LocalFile.from_path(local_path)
                     skip_reason = loc.skip_replace_remote_reason(
-                        remote_ix, skip_on_same_size
+                        remote_ix,
+                        skip_on_same_size,
+                        skip_if_same_size_without_etag_check,
                     )
                 if skip_reason == SKIP_NONE:
                     s = _just("UPLOAD")
@@ -561,6 +575,16 @@ def _download(client, s3_file, max_bandwidth_mb=None):
     # add a newline since we have been flushing stdout:
     print("")
     shutil.move(s3_file.tmp_local_path, s3_file.local_path)
+
+
+def abort_all_multipart_uploads(self, client):
+    uploads = self.s3.list_multipart_uploads(Bucket=S3_BUCKET)
+    print("Aborting", len(uploads), "uploads")
+    if "Uploads" in uploads:
+        for u in uploads["Uploads"]:
+            upload_id = u["UploadId"]
+            key = u["Key"]
+            client.abort_multipart_upload(Bucket=S3_BUCKET, Key=key, UploadId=upload_id)
 
 
 class MultipartUpload:
