@@ -163,8 +163,8 @@ class LocalFile:
     #############################################################
     @property
     def chunksize(self):
-        c = self._calc_chunksize()
-        return min([c, MULTIPART_MIN_CHUNKSIZE])
+        cs = self._calc_chunksize()
+        return max([cs, MULTIPART_MIN_CHUNKSIZE])
 
     #############################################################
     # num_parts = min(1000, filesize / MULTIPART_MIN_CHUNKSIZE (100mb))
@@ -175,8 +175,9 @@ class LocalFile:
         #   eg, for a 120_000 mb file (120gb), c = 120mb and num_parts = 1000
         # for smaller files, c = 100mb
         #  eg, for a 500 mb file, c = 100mb and num_parts = 5
-        c = self._calc_chunksize()
-        return math.ceil(float(self.size) / c)
+        cs = self.chunksize
+        np = math.ceil(float(self.size) / cs)
+        return np
 
     @property
     def etag(self):
@@ -577,8 +578,8 @@ def _download(client, s3_file, max_bandwidth_mb=None):
     shutil.move(s3_file.tmp_local_path, s3_file.local_path)
 
 
-def abort_all_multipart_uploads(self, client):
-    uploads = self.s3.list_multipart_uploads(Bucket=S3_BUCKET)
+def abort_all_multipart_uploads(client):
+    uploads = client.list_multipart_uploads(Bucket=S3_BUCKET)
     print("Aborting", len(uploads), "uploads")
     if "Uploads" in uploads:
         for u in uploads["Uploads"]:
@@ -593,6 +594,7 @@ class MultipartUpload:
         self.project = project
         self.local_file = local_file
         self.parts = []
+        self.debug = False
 
     def orphan(self):
         project_prefix = _project_prefix(self.project)
@@ -602,7 +604,7 @@ class MultipartUpload:
             Bucket=S3_BUCKET, Prefix=project_prefix
         )
         if "Uploads" not in uploads:
-            print("No 'Uploads' key.")
+            self._debug("No 'Uploads' key.")
             return None
 
         # find those that match the file
@@ -610,7 +612,7 @@ class MultipartUpload:
 
         # TODO:: also COMPARE md5 / etag
         if len(orphans) == 0:
-            print("No matching orphans.")
+            self._debug("No matching orphans.")
             return None
 
         # TODO: elect the best orphan if there is more than one:
@@ -625,15 +627,12 @@ class MultipartUpload:
             upload_id = upload["UploadId"]
             resp = self.list_parts(upload_id)
             uploaded_parts = resp.get("Parts", [])
-            # next_part_number = resp["NextPartNumberMarker"]  # 44
-            # is_truncated = resp["IsTruncated"]
-
         else:
             upload = self.create_upload()
             upload_id = upload["UploadId"]
             uploaded_parts = []
 
-        print(
+        self._debug(
             "filesize: {}mb chunksize: {}mb num_parts: {}".format(
                 self.local_file.size / 1024 / 2024,
                 self.local_file.chunksize / 1024 / 1024,
@@ -654,24 +653,21 @@ class MultipartUpload:
 
                 checksums.append(self._part_checksum(part_num, chunk))
 
+                progress_msg = "{}/{} {}mb chunks || {}mb of {}mb || {}%".format(
+                    part_num,
+                    self.local_file.num_parts,
+                    int(chunksize / 1024 / 1024),
+                    int(bytes_uploaded / 1024 / 1024),
+                    int(self.local_file.size / 1024 / 1024),
+                    int(100 * bytes_uploaded / self.local_file.size),
+                )
+
                 # continue if part already uploaded
                 if part_num in uploaded_part_nums:
-                    sys.stdout.write(
-                        "part ({} / {}) already uploaded...".format(
-                            part_num, self.local_file.num_parts
-                        )
-                    )
+                    self._write(f"[already uploaded]: {progress_msg}")
                     continue
-                sys.stdout.write(
-                    "Uploading part ({} / {}) {}mb / {}mb ... {}%".format(
-                        part_num,
-                        self.local_file.num_parts,
-                        int(chunksize / 1024 / 1024),
-                        int(self.local_file.size / 1024 / 1024),
-                        int(100 * bytes_uploaded / self.local_file.size),
-                    )
-                )
-                sys.stdout.flush()
+
+                self._write(f"[uploading ......]: {progress_msg}")
 
                 self.client.upload_part(
                     Body=chunk,
@@ -680,9 +676,21 @@ class MultipartUpload:
                     UploadId=upload_id,
                     PartNumber=part_num,
                 )
-        print("")
         self.finalize(upload_id, checksums)
-        sys.exit()
+
+    def _debug(self, message):
+        if self.debug:
+            print("{}: {}".format(self.local_file.local_path, message))
+
+    def _write(self, message):
+        sys.stdout.write(
+            "\rUPLOADING: %s: %s"
+            % (
+                self.local_file.local_path,
+                message,
+            )
+        )
+        sys.stdout.flush()
 
     def _file_reader(self):
         return open(self.local_file.local_path, "rb")
@@ -692,7 +700,7 @@ class MultipartUpload:
             UploadId=upload_id, Bucket=S3_BUCKET, Key=self.local_file.key
         )
         if "Parts" not in resp:
-            print("No 'Parts' uploaded.")
+            self._debug("No 'Parts' uploaded.")
         return resp
 
     def create_upload(self):
@@ -702,7 +710,7 @@ class MultipartUpload:
             Key=self.local_file.key,
         )
         upload_id = resp.get("UploadId")
-        print(f"Created multipart upload_id:{upload_id}")
+        self._debug(f"Created multipart upload_id:{upload_id}")
         return resp
 
     def _part_checksum(self, part_num, chunk):
@@ -726,38 +734,40 @@ class MultipartUpload:
         if checksums is None:
             checksums = self._checksums()
 
-        print(f"finalize: {self.local_file.local_path}")
-        response = self.client.complete_multipart_upload(
+        self._write("finalizing {} parts.".format(len(checksums)))
+        resp = self.client.complete_multipart_upload(
             Bucket=S3_BUCKET,
             Key=self.local_file.key,
             UploadId=upload_id,
             MultipartUpload={"Parts": checksums},
         )
-        print(response)
+        # print("")  # clear terminal
+        if 200 != resp.get("ResponseMetadata", {}).get("HTTPStatusCode"):
+            print(resp)
+            raise Exception
 
 
 def _upload(client, project, local_file, max_bandwidth_mb=None):
-    mu = MultipartUpload(client, project, local_file)
-    mu.upload()
-
-    ###################################################
-    # legacy uploader, did not resume multipart uploads
-    ###################################################
-    # x = {}
-    # # x["MetaData"] = {"Content-MD5": local_file.etag}
-    # if local_file.mime_type:
-    #     x["ContentType"] = local_file.mime_type
-    #     # , "ETag": local_file.etag
-    # client.upload_file(
-    #     local_file.local_path,
-    #     S3_BUCKET,
-    #     local_file.key,
-    #     Config=_transfer_config(max_bandwidth_mb, upload_file=local_file),
-    #     Callback=ProgressPercentage(local_file.local_path, local_file.size),
-    #     ExtraArgs=x,
-    # )
-    # # add a newline since we have been flushing stdout:
-    # print("")
+    min_multipart_upload = 1024 * 1024 * 5  # 5mb
+    if local_file.size < min_multipart_upload:
+        x = {}
+        # x["MetaData"] = {"Content-MD5": local_file.etag}
+        if local_file.mime_type:
+            x["ContentType"] = local_file.mime_type
+            # , "ETag": local_file.etag
+        client.upload_file(
+            local_file.local_path,
+            S3_BUCKET,
+            local_file.key,
+            # Config=_transfer_config(max_bandwidth_mb, upload_file=local_file),
+            # Callback=ProgressPercentage(local_file.local_path, local_file.size),
+            ExtraArgs=x,
+        )
+        # add a newline since we have been flushing stdout:
+        print("")
+    else:
+        mu = MultipartUpload(client, project, local_file)
+        mu.upload()
 
 
 class ProgressPercentage(object):
