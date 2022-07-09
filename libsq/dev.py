@@ -5,7 +5,6 @@ from . import dev
 from .utils import (
     _aws_kwargs,
     _docker_exec,
-    _duck,
     _ensure_host,
     _run_command,
     _running_ec2_docker_public_hostname,
@@ -26,10 +25,6 @@ from .utils import (
     S3_PROJECTS_PATH,
 )
 from .pg import mac_down, ec2_dump
-
-STRATEGY_DUCK = "duck"
-STRATEGY_SQ = "sq"
-STRATEGY = STRATEGY_SQ
 
 
 @dev.command(help="Start bash in docker container, inheriting SQ__ prefixed env vars.")
@@ -266,31 +261,15 @@ def s3_up(
     match_regx=None,
     max_bandwidth_mb=None,
 ):
-    # local = _s3_local_project_path(project)
-    # e = _aws_env_string()
-    # b = _s3_bucket_project_url(project)
-    # The following sync command syncs objects under a specified prefix and
-    # bucket to files in a local directory by uploading the local files to s3.
-    # A local file will require uploading if the size of the local file is
-    # different than the size of the s3 object, the last modified time of the
-    # local file is newer than the last modified time of the s3 object, or the
-    # local file does not exist under the specified bucket and prefix.
-    #
-    # WARNING: s3 sync will overwrite newer target files with older source files!
-    # DON'T USE IT
-    # _run_command(f"{e} aws s3 sync {local} {b}")
-    if STRATEGY == STRATEGY_DUCK:
-        _duck("upload", project)
-    else:
-        _sq_s3_xfer(
-            "upload",
-            project,
-            not no_skip_on_same_size,
-            skip_if_same_size_without_etag_check,
-            skip_regx,
-            match_regx,
-            max_bandwidth_mb,
-        )
+    _sq_s3_xfer(
+        "upload",
+        project,
+        not no_skip_on_same_size,
+        skip_if_same_size_without_etag_check,
+        skip_regx,
+        match_regx,
+        max_bandwidth_mb,
+    )
 
 
 @dev.command(help="Download s3 to local.")
@@ -323,16 +302,13 @@ def s3_down(
     match_regx=None,
     max_bandwidth_mb=None,
 ):
-    if STRATEGY == STRATEGY_DUCK:
-        _duck("download", project)
-    else:
-        skip_if_same_size_without_etag_check = False
-        _sq_s3_xfer(
-            "download",
-            project,
-            not no_skip_on_same_size,
-            skip_if_same_size_without_etag_check,
-            skip_regx,
-            match_regx,
-            max_bandwidth_mb,
-        )
+    skip_if_same_size_without_etag_check = False
+    _sq_s3_xfer(
+        "download",
+        project,
+        not no_skip_on_same_size,
+        skip_if_same_size_without_etag_check,
+        skip_regx,
+        match_regx,
+        max_bandwidth_mb,
+    )

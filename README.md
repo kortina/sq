@@ -5,7 +5,6 @@ NB / warning: There is a lot of configuration specific to particular projects th
 ### Setup
 
 ```sh
-brew install duck
 brew install libmagic
 pip install click boto3
 pip install python magic

@@ -411,32 +411,6 @@ def _validate_project(project):
         raise ValueError("Invalid project name.")
 
 
-def _duck(cmd, project):
-    _validate_project(project)
-    flags = " --existing=compare"
-    if cmd == "upload":
-        local = _s3_local_project_path(project)
-        remote = f"  s3:{S3_BUCKET}/projects/{project}"
-    elif cmd == "download":
-        local = S3_PROJECTS_PATH
-        remote = f"  s3:{S3_BUCKET}/projects/{project}/"  # need trailing slash
-    else:
-        raise Exception(f"{cmd} NOT_IMPLEMENTED")
-
-    cmd = (
-        "duck"
-        " -v"
-        ' --username="$SQ__AWS_ACCESS_KEY_ID"'
-        ' --password="$SQ__AWS_SECRET_KEY"'
-        f" {flags}"
-        f" --{cmd}"
-        f" {remote}"
-        f" {local}"
-        f" | rg 'Uploading|Downloading'"
-    )
-    _run_command(cmd)
-
-
 def _project_prefix(project):
     return f"projects/{project}"
 
