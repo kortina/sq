@@ -40,6 +40,8 @@ PROJECT_DIRS = [
 MULTIPART_THRESHOLD_DOWNLOAD = 1024 * 1024 * 100  # mb
 MULTIPART_MIN_CHUNKSIZE = 1024 * 1024 * 100  # mb
 MULTIPART_MAX_PARTS = 1000
+# AWS will error on chunks less than 5mb:
+AWS_MIN_CHUNKSIZE = 1024 * 1024 * 5  # 5mb
 
 
 def _transfer_config(max_bandwidth_mb=None, upload_file=None):
@@ -121,6 +123,23 @@ class S3File:
 
 
 @dataclass(frozen=True)
+class Chunk:
+    bytes: str
+    part_num: int
+    size: int
+
+    @property
+    def etag(self):
+        m = hashlib.md5()
+        m.update(self.bytes)
+        return m.hexdigest().strip('"')
+
+    @property
+    def checksum(self):
+        return {"PartNumber": self.part_num, "ETag": self.etag}
+
+
+@dataclass(frozen=True)
 class LocalFile:
     key: str
     local_path: str
@@ -175,9 +194,36 @@ class LocalFile:
         #   eg, for a 120_000 mb file (120gb), c = 120mb and num_parts = 1000
         # for smaller files, c = 100mb
         #  eg, for a 500 mb file, c = 100mb and num_parts = 5
+        # BUT... due to AWS_MIN_CHUNKSIZE
+        # a 504mb file will have c = 100mb and num_parts = 5
+        # but a 506mb file will have c = 100mb and num_arts = 6
         cs = self.chunksize
         np = math.ceil(float(self.size) / cs)
+        last_chunk = self.size % cs
+        # combine last chunk with penultimate chunk if the last chunk would be < 5mb
+        if last_chunk <= AWS_MIN_CHUNKSIZE:
+            np = np - 1
         return np
+
+    def _reader(self):
+        return open(self.local_path, "rb")
+
+    def parts(self, compute_checksums=True):
+        bytes_uploaded = 0
+        part_num = 0
+        with self._reader() as f:
+            while part_num <= self.num_parts:
+                part_num = part_num + 1
+                chunk = f.read(self.chunksize)
+                chunksize = len(chunk)
+                bytes_uploaded = bytes_uploaded + chunksize
+                bytes_remaining = self.size - bytes_uploaded
+                if bytes_remaining < AWS_MIN_CHUNKSIZE:
+                    chunk = chunk + f.read(self.chunksize)
+                    chunksize = len(chunk)
+                    bytes_uploaded = bytes_uploaded + chunksize
+                part = Chunk(bytes=chunk, part_num=part_num, size=chunksize)
+                yield part
 
     @property
     def etag(self):
@@ -616,40 +662,37 @@ class MultipartUpload:
 
         uploaded_part_nums = set([p["PartNumber"] for p in uploaded_parts])
         checksums = []
-        part_num = 0
         bytes_uploaded = 0
-        with self._file_reader() as f:
-            while part_num <= self.local_file.num_parts:
-                part_num = part_num + 1
-                chunk = f.read(self.local_file.chunksize)
-                chunksize = len(chunk)
-                bytes_uploaded = bytes_uploaded + chunksize
+        for part in self.local_file.parts():
+            part_num = part.part_num
+            chunk = part.bytes
+            chunksize = part.size
+            bytes_uploaded = bytes_uploaded + chunksize
+            checksums.append(part.checksum)
 
-                checksums.append(self._part_checksum(part_num, chunk))
+            progress_msg = "{}/{} {}mb chunks || {}mb of {}mb || {}%".format(
+                part_num,
+                self.local_file.num_parts,
+                int(chunksize / 1024 / 1024),
+                int(bytes_uploaded / 1024 / 1024),
+                int(self.local_file.size / 1024 / 1024),
+                int(100 * bytes_uploaded / self.local_file.size),
+            )
 
-                progress_msg = "{}/{} {}mb chunks || {}mb of {}mb || {}%".format(
-                    part_num,
-                    self.local_file.num_parts,
-                    int(chunksize / 1024 / 1024),
-                    int(bytes_uploaded / 1024 / 1024),
-                    int(self.local_file.size / 1024 / 1024),
-                    int(100 * bytes_uploaded / self.local_file.size),
-                )
+            # continue if part already uploaded
+            if part_num in uploaded_part_nums:
+                self._write(f"[already uploaded]: {progress_msg}")
+                continue
 
-                # continue if part already uploaded
-                if part_num in uploaded_part_nums:
-                    self._write(f"[already uploaded]: {progress_msg}")
-                    continue
+            self._write(f"[uploading ......]: {progress_msg}")
 
-                self._write(f"[uploading ......]: {progress_msg}")
-
-                self.client.upload_part(
-                    Body=chunk,
-                    Bucket=S3_BUCKET,
-                    Key=self.local_file.key,
-                    UploadId=upload_id,
-                    PartNumber=part_num,
-                )
+            self.client.upload_part(
+                Body=chunk,
+                Bucket=S3_BUCKET,
+                Key=self.local_file.key,
+                UploadId=upload_id,
+                PartNumber=part_num,
+            )
         self.finalize(upload_id, checksums)
 
     def _debug(self, message):
@@ -665,9 +708,6 @@ class MultipartUpload:
             )
         )
         sys.stdout.flush()
-
-    def _file_reader(self):
-        return open(self.local_file.local_path, "rb")
 
     def list_parts(self, upload_id):
         resp = self.client.list_parts(
@@ -687,20 +727,10 @@ class MultipartUpload:
         self._debug(f"Created multipart upload_id:{upload_id}")
         return resp
 
-    def _part_checksum(self, part_num, chunk):
-        m = hashlib.md5()
-        m.update(chunk)
-        etag = m.hexdigest().strip('"')
-        return {"PartNumber": part_num, "ETag": etag}
-
     def _checksums(self):
         checksums = []
-        part_num = 0
-        with self._file_reader() as f:
-            while part_num <= self.local_file.num_parts:
-                part_num = part_num + 1
-                chunk = f.read(self.local_file.chunksize)
-                checksums.append(self._part_checksum(part_num, chunk))
+        for part in self.local_file.parts():
+            checksums.append(part.checksum)
         return checksums
 
     def finalize(self, upload_id, checksums=None):
@@ -722,8 +752,7 @@ class MultipartUpload:
 
 
 def _upload(client, project, local_file, max_bandwidth_mb=None):
-    min_multipart_upload = 1024 * 1024 * 5  # 5mb
-    if local_file.size < min_multipart_upload:
+    if local_file.size < AWS_MIN_CHUNKSIZE:
         x = {}
         # x["MetaData"] = {"Content-MD5": local_file.etag}
         if local_file.mime_type:
