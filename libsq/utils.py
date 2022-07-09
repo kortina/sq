@@ -741,7 +741,7 @@ class MultipartUpload:
             UploadId=upload_id,
             MultipartUpload={"Parts": checksums},
         )
-        # print("")  # clear terminal
+        print("")  # clear terminal
         if 200 != resp.get("ResponseMetadata", {}).get("HTTPStatusCode"):
             print(resp)
             raise Exception
@@ -764,7 +764,7 @@ def _upload(client, project, local_file, max_bandwidth_mb=None):
             ExtraArgs=x,
         )
         # add a newline since we have been flushing stdout:
-        print("")
+        # print("")
     else:
         mu = MultipartUpload(client, project, local_file)
         mu.upload()
