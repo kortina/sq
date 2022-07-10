@@ -3,6 +3,7 @@ import getpass
 import os
 from . import dev
 from .utils import (
+    _abort_all_incomplete_multipart_uploads,
     _aws_kwargs,
     _docker_exec,
     _ensure_host,
@@ -222,6 +223,12 @@ def project_init(ctx, project):
         _run_command(f"test -e {p} || mkdir {p}")
         _run_command(f"touch {p}/.touch")
     ctx.invoke(s3_up, project=project)
+
+
+@dev.command(help="Abort all incomplete multipart uploads.")
+@click.argument("project", type=PROJECT_CHOICES, required=True)
+def abort_all_incomplete_multipart_uploads(project):
+    _abort_all_incomplete_multipart_uploads(project)
 
 
 @dev.command(help="Push local up to s3.")

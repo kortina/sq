@@ -71,6 +71,10 @@ SKIP_ISDR = "isdr"
 SKIP_MRGX = "mrgx"
 
 
+def _print_to_same_line(msg):
+    print("\r{}".format(msg), end="\x1b[1K")
+
+
 def _guess_type(filepath):
     return magic.from_file(filepath, mime=True)
 
@@ -486,6 +490,21 @@ def _just(op, skip_reason=None):
     return f"{s}:".ljust(10)
 
 
+def _abort_all_incomplete_multipart_uploads(project):
+    client = _aws_client("s3")
+    uploads = client.list_multipart_uploads(Bucket=S3_BUCKET)
+    print("ABORT: {} uploads...".format(len(uploads)))
+    if "Uploads" in uploads:
+        for u in uploads["Uploads"]:
+            upload_id = u["UploadId"]
+            key = u["Key"]
+            resp = client.abort_multipart_upload(
+                Bucket=S3_BUCKET, Key=key, UploadId=upload_id
+            )
+            status = resp.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            print(f"ABORT: [{status}] {key}")
+
+
 def _sq_s3_xfer(
     cmd,
     project,
@@ -598,16 +617,6 @@ def _download(client, s3_file, max_bandwidth_mb=None):
     shutil.move(s3_file.tmp_local_path, s3_file.local_path)
 
 
-def abort_all_multipart_uploads(client):
-    uploads = client.list_multipart_uploads(Bucket=S3_BUCKET)
-    print("Aborting", len(uploads), "uploads")
-    if "Uploads" in uploads:
-        for u in uploads["Uploads"]:
-            upload_id = u["UploadId"]
-            key = u["Key"]
-            client.abort_multipart_upload(Bucket=S3_BUCKET, Key=key, UploadId=upload_id)
-
-
 class MultipartUpload:
     def __init__(self, client, project, local_file):
         self.client = client
@@ -700,14 +709,13 @@ class MultipartUpload:
             print("{}: {}".format(self.local_file.local_path, message))
 
     def _write(self, message):
-        sys.stdout.write(
-            "\rUPLOADING: %s: %s"
-            % (
-                self.local_file.local_path,
-                message,
-            )
+        msg = "UPLOADING: %s: %s" % (
+            self.local_file.local_path,
+            message,
         )
-        sys.stdout.flush()
+        _print_to_same_line(msg)
+        # sys.stdout.write("\r%s" % msg)
+        # sys.stdout.flush()
 
     def list_parts(self, upload_id):
         resp = self.client.list_parts(
@@ -738,7 +746,7 @@ class MultipartUpload:
         if checksums is None:
             checksums = self._checksums()
 
-        self._write("finalizing {} parts.".format(len(checksums)))
+        self._write("[finalizing {} parts]: ".format(len(checksums)))
         resp = self.client.complete_multipart_upload(
             Bucket=S3_BUCKET,
             Key=self.local_file.key,
@@ -786,16 +794,15 @@ class ProgressPercentage(object):
         with self._lock:
             self._seen_so_far += bytes_amount
             percentage = (self._seen_so_far / self._size) * 100
-            sys.stdout.write(
-                "\r%s  %s / %s  (%.2f%%)"
-                % (
-                    self._filename,
-                    self._seen_so_far,
-                    self._size,
-                    percentage,
-                )
+            msg = "%s  %s / %s  (%.2f%%)" % (
+                self._filename,
+                self._seen_so_far,
+                self._size,
+                percentage,
             )
-            sys.stdout.flush()
+            _print_to_same_line(msg)
+            # sys.stdout.write("\r%s" % msg)
+            # sys.stdout.flush()
 
 
 # via: https://github.com/tlastowka/calculate_multipart_etag/blob/master/calculate_multipart_etag.py
