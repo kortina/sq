@@ -471,6 +471,8 @@ def _project_prefix(project):
     return f"projects/{project}"
 
 
+# dict of all the files already uploaded to the bucket,
+# indexed by the remote key for each file
 def _remote_ix(client, bucket, project):
     project_prefix = _project_prefix(project)
     remote_ix = {}
