@@ -71,7 +71,7 @@ SKIP_ISDR = "isdr"
 SKIP_MRGX = "mrgx"
 
 
-def _print_to_same_line(msg):
+def _print_over_same_line(msg):
     print("\r{}".format(msg), end="\x1b[1K")
 
 
@@ -713,7 +713,7 @@ class MultipartUpload:
             self.local_file.local_path,
             message,
         )
-        _print_to_same_line(msg)
+        _print_over_same_line(msg)
         # sys.stdout.write("\r%s" % msg)
         # sys.stdout.flush()
 
@@ -800,7 +800,7 @@ class ProgressPercentage(object):
                 self._size,
                 percentage,
             )
-            _print_to_same_line(msg)
+            _print_over_same_line(msg)
             # sys.stdout.write("\r%s" % msg)
             # sys.stdout.flush()
 
