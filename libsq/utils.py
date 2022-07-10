@@ -1,3 +1,4 @@
+from argparse import ArgumentError
 import boto3
 from boto3.s3.transfer import TransferConfig
 import click
@@ -5,7 +6,8 @@ from dataclasses import dataclass
 
 import datetime
 import hashlib
-from mimetypes import guess_type
+import magic
+import math
 import pathlib
 import pytz
 import os
@@ -35,19 +37,26 @@ PROJECT_DIRS = [
     "other-video",  # film and youtube clips, table reads
 ]
 
-MULTIPART_THRESHOLD = 1024 * 1024 * 100  # 100mb
-MULTIPART_CHUNKSIZE = 1024 * 1024 * 100  # 100mb
+MULTIPART_THRESHOLD_DOWNLOAD = 1024 * 1024 * 100  # mb
+MULTIPART_MIN_CHUNKSIZE = 1024 * 1024 * 100  # mb
+MULTIPART_MAX_PARTS = 1000
+# AWS will error on chunks less than 5mb:
+AWS_MIN_CHUNKSIZE = 1024 * 1024 * 5  # 5mb
 
 
-def _transfer_config(max_bandwidth_mb=None):
+def _transfer_config(max_bandwidth_mb=None, upload_file=None):
     max_bandwidth = None
     if max_bandwidth_mb:
         print(f"WARNING: max_bandwidth set to: {max_bandwidth_mb}MBps")
         max_bandwidth = 1_000_000 * max_bandwidth_mb
+    if upload_file:
+        chunksize = upload_file.chunksize
+    else:
+        chunksize = MULTIPART_MIN_CHUNKSIZE
     return TransferConfig(
-        multipart_threshold=MULTIPART_THRESHOLD,
+        multipart_threshold=MULTIPART_THRESHOLD_DOWNLOAD,
         max_concurrency=10,
-        multipart_chunksize=MULTIPART_CHUNKSIZE,
+        multipart_chunksize=chunksize,
         use_threads=True,
         max_bandwidth=max_bandwidth,
     )
@@ -60,6 +69,14 @@ SKIP_LMOD = "lmod"
 SKIP_REGX = "regx"
 SKIP_ISDR = "isdr"
 SKIP_MRGX = "mrgx"
+
+
+def _print_over_same_line(msg):
+    print("\r{}".format(msg), end="\x1b[1K")
+
+
+def _guess_type(filepath):
+    return magic.from_file(filepath, mime=True)
 
 
 def _md5(filepath, blocksize=2 ** 20):
@@ -110,12 +127,27 @@ class S3File:
 
 
 @dataclass(frozen=True)
+class Chunk:
+    bytes: str
+    part_num: int
+    size: int
+
+    @property
+    def etag(self):
+        m = hashlib.md5()
+        m.update(self.bytes)
+        return m.hexdigest().strip('"')
+
+    @property
+    def checksum(self):
+        return {"PartNumber": self.part_num, "ETag": self.etag}
+
+
+@dataclass(frozen=True)
 class LocalFile:
     key: str
     local_path: str
     last_modified: datetime.datetime
-    etag: str
-    md5: str
     size: int
     mime_type: str
 
@@ -137,20 +169,94 @@ class LocalFile:
             key=_remote_from(local_path),
             local_path=local_path,
             last_modified=d_tz,
-            etag=calculate_multipart_etag(local_path, MULTIPART_CHUNKSIZE).strip('"'),
-            md5=_md5(local_path),
             size=int(os.path.getsize(local_path)),
-            mime_type=guess_type(local_path)[0],
+            mime_type=_guess_type(local_path)[0],
         )
 
-    def skip_replace_remote_reason(self, remote_ix, skip_on_same_size=True):
+    # NB: takes a LONG time for large files to compute md5
+    @property
+    def md5(self):
+        return _md5(self.local_path)
+
+    # break the file into 1000 parts
+    # but... see `chunksize`
+    # The min chunksize is 100mb
+    def _calc_chunksize(self):
+        return math.ceil(float(self.size) / MULTIPART_MAX_PARTS)
+
+    #############################################################
+    # chunksize = max(100mb, filesize / MULTIPART_MAX_PARTS (1000) )
+    #############################################################
+    @property
+    def chunksize(self):
+        cs = self._calc_chunksize()
+        return max([cs, MULTIPART_MIN_CHUNKSIZE])
+
+    #############################################################
+    # num_parts = min(1000, filesize / MULTIPART_MIN_CHUNKSIZE (100mb))
+    # divides file into:
+    # 1000 parts (if parts are >100mb each)
+    # or into n 100mb parts
+    #############################################################
+    @property
+    def num_parts(self):
+        # for large files, c = filesize / 1000
+        #   eg, for a 120_000 mb file (120gb), c = 120mb and num_parts = 1000
+        # for smaller files, c = 100mb
+        #  eg, for a 500 mb file, c = 100mb and num_parts = 5
+        # BUT... due to AWS_MIN_CHUNKSIZE
+        # a 504mb file will have c = 100mb and num_parts = 5
+        # but a 506mb file will have c = 100mb and num_arts = 6
+        cs = self.chunksize
+        np = math.ceil(float(self.size) / cs)
+        last_chunk = self.size % cs
+        # combine last chunk with penultimate chunk if the last chunk would be < 5mb
+        if last_chunk <= AWS_MIN_CHUNKSIZE:
+            np = np - 1
+        return np
+
+    def _reader(self):
+        return open(self.local_path, "rb")
+
+    def parts(self, compute_checksums=True):
+        bytes_uploaded = 0
+        part_num = 0
+        with self._reader() as f:
+            while part_num <= self.num_parts:
+                part_num = part_num + 1
+                chunk = f.read(self.chunksize)
+                chunksize = len(chunk)
+                bytes_uploaded = bytes_uploaded + chunksize
+                bytes_remaining = self.size - bytes_uploaded
+                if bytes_remaining < AWS_MIN_CHUNKSIZE:
+                    chunk = chunk + f.read(self.chunksize)
+                    chunksize = len(chunk)
+                    bytes_uploaded = bytes_uploaded + chunksize
+                part = Chunk(bytes=chunk, part_num=part_num, size=chunksize)
+                yield part
+
+    @property
+    def etag(self):
+        return calculate_multipart_etag(self.local_path, self.chunksize).strip('"')
+
+    def skip_replace_remote_reason(
+        self,
+        remote_ix,
+        skip_on_same_size=True,
+        skip_if_same_size_without_etag_check=False,
+    ):
         r = remote_ix.get(self.key, None)
         # does not exist on remote
         if r is None:
             return SKIP_NONE
+        if skip_if_same_size_without_etag_check and not skip_on_same_size:
+            print("MUST either check size or etag.....")
+            raise ArgumentError
+
         # same md5 checksum, so no replace
-        if self.etag == r.etag or self.md5 == r.etag:
-            return SKIP_ETAG
+        if not skip_if_same_size_without_etag_check:
+            if self.etag == r.etag or self.md5 == r.etag:
+                return SKIP_ETAG
         # skip files with same size even if checksum is different
         if skip_on_same_size and self.size == r.size:
             return SKIP_SIZE
@@ -361,34 +467,14 @@ def _validate_project(project):
         raise ValueError("Invalid project name.")
 
 
-def _duck(cmd, project):
-    _validate_project(project)
-    flags = " --existing=compare"
-    if cmd == "upload":
-        local = _s3_local_project_path(project)
-        remote = f"  s3:{S3_BUCKET}/projects/{project}"
-    elif cmd == "download":
-        local = S3_PROJECTS_PATH
-        remote = f"  s3:{S3_BUCKET}/projects/{project}/"  # need trailing slash
-    else:
-        raise Exception(f"{cmd} NOT_IMPLEMENTED")
-
-    cmd = (
-        "duck"
-        " -v"
-        ' --username="$SQ__AWS_ACCESS_KEY_ID"'
-        ' --password="$SQ__AWS_SECRET_KEY"'
-        f" {flags}"
-        f" --{cmd}"
-        f" {remote}"
-        f" {local}"
-        f" | rg 'Uploading|Downloading'"
-    )
-    _run_command(cmd)
+def _project_prefix(project):
+    return f"projects/{project}"
 
 
+# dict of all the files already uploaded to the bucket,
+# indexed by the remote key for each file
 def _remote_ix(client, bucket, project):
-    project_prefix = f"projects/{project}"
+    project_prefix = _project_prefix(project)
     remote_ix = {}
     paginator = client.get_paginator("list_objects_v2")
     page_iterator = paginator.paginate(Bucket=bucket, Prefix=project_prefix)
@@ -412,10 +498,26 @@ def _just(op, skip_reason=None):
     return f"{s}:".ljust(10)
 
 
+def _abort_all_incomplete_multipart_uploads(project):
+    client = _aws_client("s3")
+    uploads = client.list_multipart_uploads(Bucket=S3_BUCKET)
+    print("ABORT: {} uploads...".format(len(uploads)))
+    if "Uploads" in uploads:
+        for u in uploads["Uploads"]:
+            upload_id = u["UploadId"]
+            key = u["Key"]
+            resp = client.abort_multipart_upload(
+                Bucket=S3_BUCKET, Key=key, UploadId=upload_id
+            )
+            status = resp.get("ResponseMetadata", {}).get("HTTPStatusCode")
+            print(f"ABORT: [{status}] {key}")
+
+
 def _sq_s3_xfer(
     cmd,
     project,
     skip_on_same_size=True,
+    skip_if_same_size_without_etag_check=False,
     skip_regx=None,
     match_regx=None,
     max_bandwidth_mb=None,
@@ -447,12 +549,14 @@ def _sq_s3_xfer(
                 else:
                     loc = LocalFile.from_path(local_path)
                     skip_reason = loc.skip_replace_remote_reason(
-                        remote_ix, skip_on_same_size
+                        remote_ix,
+                        skip_on_same_size,
+                        skip_if_same_size_without_etag_check,
                     )
                 if skip_reason == SKIP_NONE:
                     s = _just("UPLOAD")
                     print(f"{s} {local_path}")
-                    _upload(client, loc, max_bandwidth_mb)
+                    _upload(client, project, loc, max_bandwidth_mb)
                 else:
                     s = _just("skip", skip_reason)
                     print(f"{s} {local_path}")
@@ -521,23 +625,168 @@ def _download(client, s3_file, max_bandwidth_mb=None):
     shutil.move(s3_file.tmp_local_path, s3_file.local_path)
 
 
-def _upload(client, local_file, max_bandwidth_mb=None):
-    x = {}
-    # x["MetaData"] = {"Content-MD5": local_file.etag}
-    if local_file.mime_type:
-        x["ContentType"] = local_file.mime_type
-        # , "ETag": local_file.etag
+class MultipartUpload:
+    def __init__(self, client, project, local_file):
+        self.client = client
+        self.project = project
+        self.local_file = local_file
+        self.parts = []
+        self.debug = False
 
-    client.upload_file(
-        local_file.local_path,
-        S3_BUCKET,
-        local_file.key,
-        Config=_transfer_config(max_bandwidth_mb),
-        Callback=ProgressPercentage(local_file.local_path, local_file.size),
-        ExtraArgs=x,
-    )
-    # add a newline since we have been flushing stdout:
-    print("")
+    def orphan(self):
+        project_prefix = _project_prefix(self.project)
+        key = self.local_file.key
+
+        uploads = self.client.list_multipart_uploads(
+            Bucket=S3_BUCKET, Prefix=project_prefix
+        )
+        if "Uploads" not in uploads:
+            self._debug("No 'Uploads' key.")
+            return None
+
+        # find those that match the file
+        orphans = [u for u in uploads["Uploads"] if u["Key"] == key]
+
+        # TODO:: also COMPARE md5 / etag
+        if len(orphans) == 0:
+            self._debug("No matching orphans.")
+            return None
+
+        # TODO: elect the best orphan if there is more than one:
+        return orphans[0]
+
+    def upload(self):
+        upload = self.orphan()
+
+        uploaded_parts = []
+
+        if upload:
+            upload_id = upload["UploadId"]
+            resp = self.list_parts(upload_id)
+            uploaded_parts = resp.get("Parts", [])
+        else:
+            upload = self.create_upload()
+            upload_id = upload["UploadId"]
+            uploaded_parts = []
+
+        self._debug(
+            "filesize: {}mb chunksize: {}mb num_parts: {}".format(
+                self.local_file.size / 1024 / 2024,
+                self.local_file.chunksize / 1024 / 1024,
+                self.local_file.num_parts,
+            )
+        )
+
+        uploaded_part_nums = set([p["PartNumber"] for p in uploaded_parts])
+        checksums = []
+        bytes_uploaded = 0
+        for part in self.local_file.parts():
+            part_num = part.part_num
+            chunk = part.bytes
+            chunksize = part.size
+            bytes_uploaded = bytes_uploaded + chunksize
+            checksums.append(part.checksum)
+
+            progress_msg = "{}/{} {}mb chunks || {}mb of {}mb || {}%".format(
+                part_num,
+                self.local_file.num_parts,
+                int(chunksize / 1024 / 1024),
+                int(bytes_uploaded / 1024 / 1024),
+                int(self.local_file.size / 1024 / 1024),
+                int(100 * bytes_uploaded / self.local_file.size),
+            )
+
+            # continue if part already uploaded
+            if part_num in uploaded_part_nums:
+                self._write(f"[already uploaded]: {progress_msg}")
+                continue
+
+            self._write(f"[uploading ......]: {progress_msg}")
+
+            self.client.upload_part(
+                Body=chunk,
+                Bucket=S3_BUCKET,
+                Key=self.local_file.key,
+                UploadId=upload_id,
+                PartNumber=part_num,
+            )
+        self.finalize(upload_id, checksums)
+
+    def _debug(self, message):
+        if self.debug:
+            print("{}: {}".format(self.local_file.local_path, message))
+
+    def _write(self, message):
+        msg = "UPLOADING: %s: %s" % (
+            self.local_file.local_path,
+            message,
+        )
+        _print_over_same_line(msg)
+        # sys.stdout.write("\r%s" % msg)
+        # sys.stdout.flush()
+
+    def list_parts(self, upload_id):
+        resp = self.client.list_parts(
+            UploadId=upload_id, Bucket=S3_BUCKET, Key=self.local_file.key
+        )
+        if "Parts" not in resp:
+            self._debug("No 'Parts' uploaded.")
+        return resp
+
+    def create_upload(self):
+        resp = self.client.create_multipart_upload(
+            Bucket=S3_BUCKET,
+            ContentType=self.local_file.mime_type,
+            Key=self.local_file.key,
+        )
+        upload_id = resp.get("UploadId")
+        self._debug(f"Created multipart upload_id:{upload_id}")
+        return resp
+
+    def _checksums(self):
+        checksums = []
+        for part in self.local_file.parts():
+            checksums.append(part.checksum)
+        return checksums
+
+    def finalize(self, upload_id, checksums=None):
+        # recompute the parts / etags
+        if checksums is None:
+            checksums = self._checksums()
+
+        self._write("[finalizing {} parts]: ".format(len(checksums)))
+        resp = self.client.complete_multipart_upload(
+            Bucket=S3_BUCKET,
+            Key=self.local_file.key,
+            UploadId=upload_id,
+            MultipartUpload={"Parts": checksums},
+        )
+        print("")  # clear terminal
+        if 200 != resp.get("ResponseMetadata", {}).get("HTTPStatusCode"):
+            print(resp)
+            raise Exception
+
+
+def _upload(client, project, local_file, max_bandwidth_mb=None):
+    if local_file.size < AWS_MIN_CHUNKSIZE:
+        x = {}
+        # x["MetaData"] = {"Content-MD5": local_file.etag}
+        if local_file.mime_type:
+            x["ContentType"] = local_file.mime_type
+            # , "ETag": local_file.etag
+        client.upload_file(
+            local_file.local_path,
+            S3_BUCKET,
+            local_file.key,
+            # Config=_transfer_config(max_bandwidth_mb, upload_file=local_file),
+            # Callback=ProgressPercentage(local_file.local_path, local_file.size),
+            ExtraArgs=x,
+        )
+        # add a newline since we have been flushing stdout:
+        # print("")
+    else:
+        mu = MultipartUpload(client, project, local_file)
+        mu.upload()
 
 
 class ProgressPercentage(object):
@@ -553,16 +802,15 @@ class ProgressPercentage(object):
         with self._lock:
             self._seen_so_far += bytes_amount
             percentage = (self._seen_so_far / self._size) * 100
-            sys.stdout.write(
-                "\r%s  %s / %s  (%.2f%%)"
-                % (
-                    self._filename,
-                    self._seen_so_far,
-                    self._size,
-                    percentage,
-                )
+            msg = "%s  %s / %s  (%.2f%%)" % (
+                self._filename,
+                self._seen_so_far,
+                self._size,
+                percentage,
             )
-            sys.stdout.flush()
+            _print_over_same_line(msg)
+            # sys.stdout.write("\r%s" % msg)
+            # sys.stdout.flush()
 
 
 # via: https://github.com/tlastowka/calculate_multipart_etag/blob/master/calculate_multipart_etag.py

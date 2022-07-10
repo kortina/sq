@@ -5,8 +5,9 @@ NB / warning: There is a lot of configuration specific to particular projects th
 ### Setup
 
 ```sh
-brew install duck
+brew install libmagic
 pip install click boto3
+pip install python magic
 
 dk up --build
 
@@ -21,14 +22,14 @@ This is a click command line tool with some of these commands:
 
 ```sh
 
-❯ sq           
+❯ sq
 dev     -- Local (mac host) commands.
 docker  -- Commands to be run inside the docker host...
 ffmpeg  -- ffmpeg commands.
 pg      -- pg commands.
 tf      -- Terraform commands.
 
-❯ sq dev       
+❯ sq dev
 bash          -- Start bash in docker container, inheriting...
 bootstrap     -- pre bootstrap.
 mk-opt-ebs    -- Create mac host /opt/ebs/pgdata
@@ -51,14 +52,14 @@ tf-plan     -- Run tf plan in docker.
 ❯ sq docker
 resolve-mp4  -- Convert to mp4 for import to DaVinci Resolve.
 
-❯ sq pg         
-dump                  -- pg_dump the Mac DaVinci db.                                                                                                                                                       
-ec2-dump              -- backup all ec2 dbs in cluster to s3                                                                                                                                               
-mac-down              -- Stop the Mac DaVinci db (to free port 5432).                                                                                                                                      
-mac-up                -- Start the Mac DaVinci db.                                                                                                                                                         
-restore-ec2  restore  -- restore db.  
+❯ sq pg
+dump                  -- pg_dump the Mac DaVinci db.
+ec2-dump              -- backup all ec2 dbs in cluster to s3
+mac-down              -- Stop the Mac DaVinci db (to free port 5432).
+mac-up                -- Start the Mac DaVinci db.
+restore-ec2  restore  -- restore db.
 
-❯ sq tf      
+❯ sq tf
 apply  -- Apply tf plan in docker.
 plan   -- Run tf plan in docker.
 
@@ -66,7 +67,7 @@ plan   -- Run tf plan in docker.
 
 ### sq_pg docker container
 
-Runs `postgres:9.5.23` in docker and fwds host port `54325` to container port `5432`, ie, you can connect to the docker postgres instance on mac port `54325` from Posticco or DaVinci. See `docker-compose.yml` for the rest of the db config.
+Runs `postgres:9.5.23` in docker and forwards host port `54325` to container port `5432`, ie, you can connect to the docker postgres instance on mac port `54325` from Postico or DaVinci. See `docker-compose.yml` for the rest of the db config.
 
 ### sq_tf docker container
 
