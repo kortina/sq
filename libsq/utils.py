@@ -178,6 +178,9 @@ class LocalFile:
     def md5(self):
         return _md5(self.local_path)
 
+    # break the file into 1000 parts
+    # but... see `chunksize`
+    # The min chunksize is 100mb
     def _calc_chunksize(self):
         return math.ceil(float(self.size) / MULTIPART_MAX_PARTS)
 
@@ -191,6 +194,9 @@ class LocalFile:
 
     #############################################################
     # num_parts = min(1000, filesize / MULTIPART_MIN_CHUNKSIZE (100mb))
+    # divides file into:
+    # 1000 parts (if parts are >100mb each)
+    # or into n 100mb parts
     #############################################################
     @property
     def num_parts(self):
