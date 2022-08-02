@@ -7,7 +7,7 @@ NB / warning: There is a lot of configuration specific to particular projects th
 ```sh
 brew install libmagic
 pip install click boto3
-pip install python magic
+pip install python-magic
 
 dk up --build
 
