@@ -29,6 +29,7 @@ PGDATA_PATH = f"{EBS_PATH}/pgdata"
 PG_LOG_PATH = f"{EBS_PATH}/pg_log"
 S3_BUCKET = "sq-us-west-1"
 PROJECT_DIRS = [
+    "capture",  # for DaVinci
     "dailies",
     "exports",
     "gallery",  # for DaVinci
