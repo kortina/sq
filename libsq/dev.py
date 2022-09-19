@@ -7,6 +7,7 @@ from .utils import (
     _aws_kwargs,
     _docker_exec,
     _ensure_host,
+    _ensure_local_path,
     _run_command,
     _running_ec2_docker_public_hostname,
     _s3_local_project_path,
@@ -319,3 +320,27 @@ def s3_down(
         match_regx,
         max_bandwidth_mb,
     )
+
+
+@dev.command(
+    help="rsync Proxies (and exclude .braw files) from external Volume to local."
+)
+@click.argument("project", type=PROJECT_CHOICES, required=True)
+@click.argument("volume-path", type=click.Path(exists=True))
+def rsync_proxies_from_volume_to_opt(
+    project,
+    volume_path,
+):
+    cmd = "rsync -av"
+    flags = "--exclude='*.braw'"
+    project_path = _s3_local_project_path(project)
+
+    # ensure volume_path has trailing slash (for rsync)
+    if volume_path[-1] != "/":
+        volume_path = f"{volume_path}/"
+
+    _ensure_local_path(volume_path)
+
+    cmd = f'{cmd} "{volume_path}" "{project_path}" {flags}'
+    print(cmd)
+    _run_command(cmd)

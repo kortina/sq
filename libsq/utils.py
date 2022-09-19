@@ -873,3 +873,8 @@ def calculate_multipart_etag(source_path, chunk_size, expected=None):
             )
 
     return new_etag
+
+
+def _ensure_local_path(local_path):
+    if not os.path.exists(local_path):
+        raise ValueError(f"Path does not exist: {local_path}")
