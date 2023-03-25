@@ -691,12 +691,17 @@ class MultipartUpload:
             bytes_uploaded = bytes_uploaded + chunksize
             checksums.append(part.checksum)
 
-            progress_msg = "{}/{} {}mb chunks || {}mb of {}mb || {}%".format(
+            max_msg = ""
+            if max_bandwidth_mb:
+                max_msg = f"{max_bandwidth_mb:,.2f}mbps max || "
+
+            progress_msg = "{}/{} {}mb chunks || {}mb of {}mb || {}{}%".format(
                 part_num,
                 self.local_file.num_parts,
                 int(chunksize / 1024 / 1024),
                 int(bytes_uploaded / 1024 / 1024),
                 int(self.local_file.size / 1024 / 1024),
+                max_msg,
                 int(100 * bytes_uploaded / self.local_file.size),
             )
 
@@ -747,9 +752,12 @@ class MultipartUpload:
         if self.debug:
             print("{}: {}".format(self.local_file.local_path, message))
 
-    def _write(self, message):
+    def _write(self, message, pp=False):
+        p = self.local_file.local_path
+        if pp:
+            p = _pretty_path(p)
         msg = "UPLOADING: %s: %s" % (
-            self.local_file.local_path,
+            p,
             message,
         )
         _print_over_same_line(msg)
@@ -908,3 +916,20 @@ def calculate_multipart_etag(source_path, chunk_size, expected=None):
 def _ensure_local_path(local_path):
     if not os.path.exists(local_path):
         raise ValueError(f"Path does not exist: {local_path}")
+
+
+def _pretty_path(filepath):
+    # Split the file path into its constituent parts
+    parts = list(pathlib.Path(filepath).parts)
+
+    # remove the leading / or drive name:
+    short = parts.pop(0)
+    new = []
+    lix = len(parts) - 1
+    for ix, part in enumerate(parts):
+        if ix in [3, lix, lix - 1, (lix - 2)]:
+            new.append(part)
+        else:
+            # use the first letter of the dir
+            new.append(part[0])
+    return short + os.sep.join(new)
