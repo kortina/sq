@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 
 
 TF_CONTAINER = "sq_tf"
@@ -633,6 +634,7 @@ class MultipartUpload:
         self.local_file = local_file
         self.parts = []
         self.debug = False
+        self.ts = None
 
     def orphan(self):
         project_prefix = _project_prefix(self.project)
@@ -656,7 +658,7 @@ class MultipartUpload:
         # TODO: elect the best orphan if there is more than one:
         return orphans[0]
 
-    def upload(self):
+    def upload(self, max_bandwidth_mb=None):
         upload = self.orphan()
 
         uploaded_parts = []
@@ -682,6 +684,7 @@ class MultipartUpload:
         checksums = []
         bytes_uploaded = 0
         for part in self.local_file.parts():
+            self._reset_timer()
             part_num = part.part_num
             chunk = part.bytes
             chunksize = part.size
@@ -711,7 +714,34 @@ class MultipartUpload:
                 UploadId=upload_id,
                 PartNumber=part_num,
             )
+
+            self._throttle_upload_speed(
+                chunksize=chunksize, max_bandwidth_mb=max_bandwidth_mb
+            )
+
         self.finalize(upload_id, checksums)
+
+    def _reset_timer(self):
+        self.ts = time.time()
+
+    def _throttle_upload_speed(self, chunksize, max_bandwidth_mb):
+        te = time.time()
+        secs_elapsed = te - self.ts
+        chunk_mb = chunksize / 1024.0 / 1024.0
+        mbps = chunk_mb / secs_elapsed
+
+        progress_msg = f"{chunk_mb:,.1f}mb in {secs_elapsed:,.1f}s = {mbps:,.1f}mbps"
+        self._write(f"[uploaded ......]: {progress_msg}")
+
+        if max_bandwidth_mb and mbps > max_bandwidth_mb:
+            secs_target = chunk_mb / max_bandwidth_mb
+            secs_sleep = int(secs_target - secs_elapsed)
+
+            while secs_sleep > 0:
+                progress_msg = f"{secs_sleep:,.1f}s ({mbps:,.1f}mbps > max {max_bandwidth_mb:,.1f}mbps)"
+                self._write(f"[sleeping ......]: {progress_msg}")
+                time.sleep(1)
+                secs_sleep = secs_sleep - 1
 
     def _debug(self, message):
         if self.debug:
@@ -787,7 +817,7 @@ def _upload(client, project, local_file, max_bandwidth_mb=None):
         # print("")
     else:
         mu = MultipartUpload(client, project, local_file)
-        mu.upload()
+        mu.upload(max_bandwidth_mb=max_bandwidth_mb)
 
 
 class ProgressPercentage(object):
