@@ -1,5 +1,5 @@
 variable "aws_region" {
-  default = "us-west-1"
+  default = "us-east-1"
 }
 
 variable "aws_account_id" {
@@ -8,7 +8,7 @@ variable "aws_account_id" {
 }
 
 variable "aws_availability_zones" {
-  default = ["us-west-1a", "us-west-1b", "us-west-1c"]
+  default = ["us-east-1a", "us-east-1b", "us-east-1c"]
 }
 
 variable "access_key" {} # get from env TF_VAR_access_key

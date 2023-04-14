@@ -35,7 +35,7 @@ data "aws_ami" "ubuntu" {
 }
 
 resource "aws_ebs_volume" "docker-host-data-vol" {
-  availability_zone = "us-west-1a"
+  availability_zone = "us-east-1a"
   size = 20
   tags = {
     Name = "docker-host"
@@ -51,7 +51,7 @@ resource "aws_ebs_volume" "docker-host-data-vol" {
 resource "aws_instance" "docker-host" {
   ami               = data.aws_ami.ubuntu.id
   instance_type     = "t2.micro"
-  availability_zone = "us-west-1a"
+  availability_zone = "us-east-1a"
   security_groups   = ["${aws_security_group.docker-host-ssh.name}"]
   key_name          = "sq_aws"
   tags = {

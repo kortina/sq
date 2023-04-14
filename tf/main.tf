@@ -4,7 +4,7 @@ module "ec2_docker_instance" {
 
 resource "aws_s3_bucket" "cyberpunk202x" {
     bucket                      = "cyberpunk202x"
-    # region                      = "us-west-1"
+    # region                      = "us-east-1"
     request_payer               = "BucketOwner"
     tags                        = {}
 

@@ -1,23 +1,22 @@
-from argparse import ArgumentError
-import boto3
-from boto3.s3.transfer import TransferConfig
-import click
-from dataclasses import dataclass
-
 import datetime
 import hashlib
-import magic
 import math
-import pathlib
-import pytz
 import os
+import pathlib
 import re
 import shutil
 import subprocess
 import sys
 import threading
 import time
+from argparse import ArgumentError
+from dataclasses import dataclass
 
+import boto3
+import click
+import magic
+import pytz
+from boto3.s3.transfer import TransferConfig
 
 TF_CONTAINER = "sq_tf"
 PG_CONTAINER = "sq_pg"
@@ -28,7 +27,7 @@ S3_PATH = "/opt/s3"
 S3_PROJECTS_PATH = "/opt/s3/projects"
 PGDATA_PATH = f"{EBS_PATH}/pgdata"
 PG_LOG_PATH = f"{EBS_PATH}/pg_log"
-S3_BUCKET = "sq-us-west-1"
+S3_BUCKET = "sq-us-east-1"
 PROJECT_DIRS = [
     "capture",  # for DaVinci
     "dailies",
@@ -307,7 +306,7 @@ def _aws_env_string():
 def _aws_client(service):
     return boto3.client(service, **_aws_kwargs())
     # return Config(
-    #     region_name = 'us-west-2',
+    #     region_name = 'us-east-2',
     #     signature_version = 'v4',
     #     retries = {
     #         'max_attempts': 10,

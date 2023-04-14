@@ -15,7 +15,7 @@ echo "-- NB: this script will fail if you dont have the AWS_ evn vars set. --"
 while :
 do
     # self-attach ebs volume
-    aws --region us-west-1 ec2 attach-volume --volume-id $volume_id --instance-id $INSTANCE_ID --device $device_name
+    aws --region us-east-1 ec2 attach-volume --volume-id $volume_id --instance-id $INSTANCE_ID --device $device_name
 
     if lsblk | grep $lsblk_name; then
         echo "attached"
