@@ -720,7 +720,9 @@ class MultipartUpload:
             )
 
             self._throttle_upload_speed(
-                chunksize=chunksize, max_bandwidth_mb=max_bandwidth_mb
+                chunksize=chunksize,
+                max_bandwidth_mb=max_bandwidth_mb,
+                status_msg=progress_msg,
             )
 
         self.finalize(upload_id, checksums)
@@ -728,22 +730,25 @@ class MultipartUpload:
     def _reset_timer(self):
         self.ts = time.time()
 
-    def _throttle_upload_speed(self, chunksize, max_bandwidth_mb):
+    def _throttle_upload_speed(self, chunksize, max_bandwidth_mb, status_msg):
         te = time.time()
         secs_elapsed = te - self.ts
         chunk_mb = chunksize / 1024.0 / 1024.0
         mbps = chunk_mb / secs_elapsed
 
         progress_msg = f"{chunk_mb:,.1f}mb in {secs_elapsed:,.1f}s = {mbps:,.1f}mbps"
-        self._write(f"[uploaded ......]: {progress_msg}")
+        self._write(f"[uploaded ......]: {progress_msg} /// {status_msg}")
 
         if max_bandwidth_mb and mbps > max_bandwidth_mb:
             secs_target = chunk_mb / max_bandwidth_mb
             secs_sleep = int(secs_target - secs_elapsed)
 
             while secs_sleep > 0:
-                progress_msg = f"{secs_sleep:,.1f}s ({mbps:,.1f}mbps > max {max_bandwidth_mb:,.1f}mbps)"
-                self._write(f"[sleeping ......]: {progress_msg}")
+                progress_msg = (
+                    f"{secs_sleep:,.1f}s ({mbps:,.1f}mbps"
+                    f" > max {max_bandwidth_mb:,.1f}mbps)"
+                )
+                self._write(f"[sleeping ......]: {progress_msg} /// {status_msg}")
                 time.sleep(1)
                 secs_sleep = secs_sleep - 1
 
