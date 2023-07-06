@@ -1,8 +1,19 @@
-import click
 import getpass
 import os
+
+import click
+
 from . import dev
+from .pg import ec2_dump, mac_down
 from .utils import (
+    EBS_PATH,
+    EC2_USER,
+    PG_LOG_PATH,
+    PGDATA_PATH,
+    PROJECT_CHOICES,
+    PROJECT_DIRS,
+    S3_PATH,
+    S3_PROJECTS_PATH,
     _abort_all_incomplete_multipart_uploads,
     _aws_kwargs,
     _docker_exec,
@@ -12,21 +23,12 @@ from .utils import (
     _running_ec2_docker_public_hostname,
     _s3_local_project_path,
     _s3_local_projects,
-    _ssh_add,
-    _ssh_run,
     _sq_path_join,
     _sq_s3_xfer,
+    _ssh_add,
+    _ssh_run,
     _validate_project,
-    EBS_PATH,
-    EC2_USER,
-    PGDATA_PATH,
-    PG_LOG_PATH,
-    PROJECT_DIRS,
-    PROJECT_CHOICES,
-    S3_PATH,
-    S3_PROJECTS_PATH,
 )
-from .pg import mac_down, ec2_dump
 
 
 @dev.command(help="Start bash in docker container, inheriting SQ__ prefixed env vars.")
@@ -78,13 +80,13 @@ def mk_opt_ebs():
 
 
 def _mk_opt_davinci():
-    p = "/opt/davinci"
+    p = "/opt/__RESOLVE__"
     _run_command(f"test -e {p}/capture || sudo mkdir -p {p}/capture")
     _run_command(f"test -e {p}/proxy || sudo mkdir -p {p}/proxy")
     _run_command(f'sudo chown -R "`id -u -n`":staff {p}')
 
 
-@dev.command(help="Create mac host /opt/davinci cache dirs")
+@dev.command(help="Create mac host /opt/__RESOLVE__ cache dirs")
 def mk_opt_davinci():
     _mk_opt_davinci()
 
@@ -196,15 +198,19 @@ def project_init(ctx, project):
     #####################
     # create davinci dirs
     #####################
-    p = "/opt/davinci"
+    p = "/opt/__RESOLVE__"
     _run_command(f"test -e {p} || ( sudo mkdir {p} && sudo chown -R {u}:staff {p} )")
 
     # create a cache directory
-    p = "/opt/davinci/cache"
+    p = "/opt/__RESOLVE__/CacheClip"
     _run_command(f"test -e {p} || mkdir {p}")
 
     # create a capture directory
-    p = "/opt/davinci/capture"
+    p = "/opt/__RESOLVE__/capture"
+    _run_command(f"test -e {p} || mkdir {p}")
+
+    # create a gallery directory
+    p = "/opt/__RESOLVE__/.gallery"
     _run_command(f"test -e {p} || mkdir {p}")
 
     #####################
