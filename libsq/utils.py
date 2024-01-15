@@ -630,6 +630,7 @@ class MultipartUpload:
 
     @classmethod
     def print_status(cls):
+        print("")
         print("----------------------------------")
         t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         print(f"ERROR AT: {t}")
