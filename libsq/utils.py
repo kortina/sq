@@ -80,7 +80,7 @@ def _guess_type(filepath):
     return magic.from_file(filepath, mime=True)
 
 
-def _md5(filepath, blocksize=2 ** 20):
+def _md5(filepath, blocksize=2**20):
     m = hashlib.md5()
     with open(filepath, "rb") as f:
         while True:
@@ -324,13 +324,9 @@ def _running_ec2_docker_instance():
         ]
     )
     if len(d["Reservations"]) > 1:
-        raise ValueError(
-            f"More than one reservation matches name: {EC2_DOCKER_HOST_NAME_TAG}"
-        )
+        raise ValueError(f"More than one reservation matches name: {EC2_DOCKER_HOST_NAME_TAG}")
     if len(d["Reservations"][0]["Instances"]) > 1:
-        raise ValueError(
-            f"More than one instance matches name: {EC2_DOCKER_HOST_NAME_TAG}"
-        )
+        raise ValueError(f"More than one instance matches name: {EC2_DOCKER_HOST_NAME_TAG}")
     return d["Reservations"][0]["Instances"][0]
 
 
@@ -380,9 +376,7 @@ def _run_command(
             sys.exit(code)
     else:
         try:
-            p = subprocess.run(
-                cmd, shell=True, check=True, capture_output=capture_output
-            )
+            p = subprocess.run(cmd, shell=True, check=True, capture_output=capture_output)
         except subprocess.CalledProcessError as e:  # remote commands sometimes throw this
             p = subprocess.CompletedProcess(cmd, e.returncode, stderr=e.output)
         # return this as a string you can actually work with:
@@ -435,9 +429,7 @@ def _ssh_run(cmd, user=None, host=None):
     if host is None:
         host = _running_ec2_docker_public_hostname()
     _ssh_add()
-    _run_command(
-        f"ssh {user}@{host} 'source .bash_profile && {cmd}'", capture_output=False
-    )
+    _run_command(f"ssh {user}@{host} 'source .bash_profile && {cmd}'", capture_output=False)
 
 
 def _s3_local_project_path(project):
@@ -507,9 +499,7 @@ def _abort_all_incomplete_multipart_uploads(project):
         for u in uploads["Uploads"]:
             upload_id = u["UploadId"]
             key = u["Key"]
-            resp = client.abort_multipart_upload(
-                Bucket=S3_BUCKET, Key=key, UploadId=upload_id
-            )
+            resp = client.abort_multipart_upload(Bucket=S3_BUCKET, Key=key, UploadId=upload_id)
             status = resp.get("ResponseMetadata", {}).get("HTTPStatusCode")
             print(f"ABORT: [{status}] {key}")
 
@@ -609,10 +599,7 @@ def _download(client, s3_file, max_bandwidth_mb=None):
     target_dir = os.path.dirname(s3_file.local_path)
     os.makedirs(target_dir, exist_ok=True)
 
-    size = (
-        client.head_object(Bucket=S3_BUCKET, Key=s3_file.key).get("ContentLength", None)
-        or 1
-    )
+    size = client.head_object(Bucket=S3_BUCKET, Key=s3_file.key).get("ContentLength", None) or 1
 
     client.download_file(
         S3_BUCKET,
@@ -627,6 +614,8 @@ def _download(client, s3_file, max_bandwidth_mb=None):
 
 
 class MultipartUpload:
+    STATUS = "_STATUS_"
+
     def __init__(self, client, project, local_file):
         self.client = client
         self.project = project
@@ -635,13 +624,23 @@ class MultipartUpload:
         self.debug = False
         self.ts = None
 
+    @classmethod
+    def set_status(cls, status):
+        cls.STATUS = status
+
+    @classmethod
+    def print_status(cls):
+        print("----------------------------------")
+        t = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+        print(f"ERROR AT: {t}")
+        print(cls.STATUS)
+        print("----------------------------------")
+
     def orphan(self):
         project_prefix = _project_prefix(self.project)
         key = self.local_file.key
 
-        uploads = self.client.list_multipart_uploads(
-            Bucket=S3_BUCKET, Prefix=project_prefix
-        )
+        uploads = self.client.list_multipart_uploads(Bucket=S3_BUCKET, Prefix=project_prefix)
         if "Uploads" not in uploads:
             self._debug("No 'Uploads' key.")
             return None
@@ -745,8 +744,7 @@ class MultipartUpload:
 
             while secs_sleep > 0:
                 progress_msg = (
-                    f"{secs_sleep:,.1f}s ({mbps:,.1f}mbps"
-                    f" > max {max_bandwidth_mb:,.1f}mbps)"
+                    f"{secs_sleep:,.1f}s ({mbps:,.1f}mbps" f" > max {max_bandwidth_mb:,.1f}mbps)"
                 )
                 self._write(f"[sleeping ......]: {progress_msg} /// {status_msg}")
                 time.sleep(1)
@@ -764,14 +762,13 @@ class MultipartUpload:
             p,
             message,
         )
+        MultipartUpload.set_status(msg)
         _print_over_same_line(msg)
         # sys.stdout.write("\r%s" % msg)
         # sys.stdout.flush()
 
     def list_parts(self, upload_id):
-        resp = self.client.list_parts(
-            UploadId=upload_id, Bucket=S3_BUCKET, Key=self.local_file.key
-        )
+        resp = self.client.list_parts(UploadId=upload_id, Bucket=S3_BUCKET, Key=self.local_file.key)
         if "Parts" not in resp:
             self._debug("No 'Parts' uploaded.")
         return resp
@@ -829,7 +826,11 @@ def _upload(client, project, local_file, max_bandwidth_mb=None):
         # print("")
     else:
         mu = MultipartUpload(client, project, local_file)
-        mu.upload(max_bandwidth_mb=max_bandwidth_mb)
+        try:
+            mu.upload(max_bandwidth_mb=max_bandwidth_mb)
+        except (Exception, KeyboardInterrupt) as e:
+            MultipartUpload.print_status()
+            raise e
 
 
 class ProgressPercentage(object):
@@ -877,7 +878,6 @@ class ProgressPercentage(object):
 
 
 def calculate_multipart_etag(source_path, chunk_size, expected=None):
-
     """
     calculates a multipart upload etag for amazon s3
     Arguments:
@@ -892,7 +892,6 @@ def calculate_multipart_etag(source_path, chunk_size, expected=None):
 
     with open(source_path, "rb") as fp:
         while True:
-
             data = fp.read(chunk_size)
 
             if not data:
@@ -910,9 +909,7 @@ def calculate_multipart_etag(source_path, chunk_size, expected=None):
 
     if expected:
         if not expected == new_etag:
-            raise ValueError(
-                "new etag %s does not match expected %s" % (new_etag, expected)
-            )
+            raise ValueError("new etag %s does not match expected %s" % (new_etag, expected))
 
     return new_etag
 
