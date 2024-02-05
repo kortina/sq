@@ -533,9 +533,10 @@ def _sq_s3_xfer(
                 # skip DS_STORE files
                 if re.search(r"\.DS_Store$", file):
                     continue
-                if skip_rx and skip_rx.search(file):
+                # NB: changed from matching `file` to `local_path`
+                if skip_rx and skip_rx.search(local_path):
                     skip_reason = SKIP_REGX
-                elif match_rx and not match_rx.search(file):
+                elif match_rx and not match_rx.search(local_path):
                     skip_reason = SKIP_MRGX
                 else:
                     loc = LocalFile.from_path(local_path)
