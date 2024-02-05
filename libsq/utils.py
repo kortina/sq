@@ -555,6 +555,7 @@ def _sq_s3_xfer(
 
     elif cmd == "download":
         for key, s3_file in remote_ix.items():
+            # NB: these regex match the entire s3_file.key (which I THINK should have effectively a full path)
             if skip_rx and skip_rx.search(s3_file.key):
                 skip_reason = SKIP_REGX
             elif match_rx and not match_rx.search(s3_file.key):
